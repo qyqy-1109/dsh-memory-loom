@@ -140,7 +140,7 @@ await check('host: 注册了 agent/pre-step 监听', () => {
 await check('host: 导出/导入路由都在（面板的两个管理动作）', async () => {
   // 面板只发请求，路由漏挂就是「按钮点了没反应」，所以静态盯一眼
   const indexSource = await readFile(join(process.cwd(), 'lib', 'index.js'), 'utf8');
-  for (const branch of ["route === 'api/export'", "route === 'api/import'"]) {
+  for (const branch of ["route === 'api/export'", "route === 'api/import'", "route === 'api/tidy'"]) {
     if (!indexSource.includes(branch)) throw new Error(`缺少路由分支 ${branch}`);
   }
 });

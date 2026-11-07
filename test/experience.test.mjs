@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { MemoryStore } from '../lib/store.js';
+import { looksLikeProcessLog } from '../lib/text.js';
 import {
   composeRecallQuery,
   extractUserText,
@@ -108,3 +109,50 @@ test('会话消息抽取：只留用户原话（导出/导入这类按钮不参�
   ];
   assert.equal(extractUserText(messages), '把导出按钮挪到页头');
 });
+
+test('过程记录判据：带版本号 + 变更动作才算，结论式句子不算', () => {
+  assert.equal(looksLikeProcessLog('v0.30.1 修「状态」分类永远 0 条：slot 数据存在 state.slots'), true);
+  assert.equal(looksLikeProcessLog('写入机制 v0.19.0：memory_write 支持 entries 批量'), true);
+  assert.equal(looksLikeProcessLog('v0.28.0：归纳加 keep-ratio，只压缩权重靠后的 70%'), true);
+  // 提到版本号但是结论口吻：不归档
+  assert.equal(looksLikeProcessLog('面板最终定为三维记忆海（v0.28 那版的效果）'), false);
+  assert.equal(looksLikeProcessLog('用户偏好不透明的深空面板'), false);
+  assert.equal(looksLikeProcessLog('2026-11-07 下午换过一次承载'), false);
+});
+
+test('整理过程记录：只归档 changelog 式条目，结论 / 亲口记忆 / 约束一条不碰', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'loom-tidy-'));
+  const store = new MemoryStore({ storePath: join(dir, 'store.json'), compactAt: 0 });
+  await store.open();
+  await store.write({ kind: 'fact', text: 'v0.30.1 修「状态」分类永远 0 条：slot 数据存在 state.slots', source: 't' });
+  await store.write({ kind: 'fact', text: '写入机制 v0.19.0：memory_write 支持 entries 批量', source: 't' });
+  await store.write({ kind: 'fact', text: '用户偏好不透明的深空面板', source: 'tool' });
+  await store.write({ kind: 'fact', text: 'v0.30.2 起面板不要任何返回按钮', explicit: true, source: 'explicit' });
+  await store.write({ kind: 'constraint', text: 'v0.30.1 起：改源码只用 read/write/edit', source: 't' });
+
+  const preview = await store.tidyProcessLogs({ apply: false });
+  assert.equal(preview.count, 2, '只有两条 changelog 式条目');
+  assert.equal(store.active().length, 5, '预览不能改库');
+
+  const applied = await store.tidyProcessLogs({ apply: true });
+  assert.equal(applied.archived, 2);
+  const archived = store.state.memories.filter((row) => row.archivedReason === 'bulk-log');
+  assert.equal(archived.length, 2);
+
+  const alive = store.active().map((row) => row.text);
+  assert.ok(alive.includes('用户偏好不透明的深空面板'), '结论不能被当成过程记录');
+  assert.ok(alive.includes('v0.30.2 起面板不要任何返回按钮'), 'explicit（亲口说的）必须豁免');
+  assert.ok(alive.includes('v0.30.1 起：改源码只用 read/write/edit'), '约束只解除不归档');
+
+  // 归档可单条恢复
+  const restored = await store.restore(archived[0].id);
+  assert.equal(restored.restored, true);
+  assert.ok(store.active().some((row) => row.id === archived[0].id));
+
+  // 再预览一次：已经没候选了
+  const again = await store.tidyProcessLogs({ apply: false });
+  assert.equal(again.count, 1, '恢复出来的那条会重新成为候选（说明恢复真的生效了）');
+
+  await rm(dir, { recursive: true, force: true });
+});
+
