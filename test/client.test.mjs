@@ -154,6 +154,21 @@ test('关键词：中文二元组、去停用词、限条数', async () => {
   assert.deepEqual(client.__internals.keywordsOf(''), []);
 });
 
+test('金线开关：关掉后一条取代线都不画，普通线照旧', async () => {
+  const client = await loadClient();
+  const { layoutSea, buildEdges, projectAll, paintEdges, CAM_DEFAULT } = client.__internals;
+  const { points } = layoutSea(makeMemories(80));
+  const edges = buildEdges(points, { maxNeighbors: 6, minScore: 0.15 });
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const positions = new Map(projected.map((p) => [p.point.id, p]));
+
+  const on = paintEdges(makeFakeCtx({ stroke: 0 }), edges, positions, { showGold: true });
+  const off = paintEdges(makeFakeCtx({ stroke: 0 }), edges, positions, { showGold: false });
+  assert.ok(on.goldCount > 0, '夹具里应当有取代关系');
+  assert.equal(off.goldCount, 0, '关掉之后不能再画金线');
+  assert.equal(off.total, on.total - on.goldCount, '只跳过金线，普通线一条不少');
+});
+
 test('布局按簇大小分配体积：大簇不挤、簇与簇不重叠', async () => {
   const client = await loadClient();
   const { layoutSea } = client.__internals;

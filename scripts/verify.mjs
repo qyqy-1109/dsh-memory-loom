@@ -163,6 +163,11 @@ await check('client: 星图点选走 focusFromStar，且点击判定不依赖残
   if (/if \(model\.dragMoved\) \{/.test(source)) throw new Error('还在用 dragMoved 做点击判定：拖动后第一次点击会被吞');
 });
 
+await check('client: 金线可以整类关掉（库里只有一两条时不至于扎眼）', () => {
+  if (!source.includes('showGold')) throw new Error('缺少金线开关（showGold）');
+  if (!source.includes("t('金线')")) throw new Error('缺少金线按钮');
+});
+
 await check('client: 拖拽按增量推进（不在 clamp 上"还债"）', () => {
   if (!source.includes('stepOrbit(')) throw new Error('拖拽没有走 stepOrbit');
   if (/model\.dragging\.pitch - dy \* 0\.006/.test(source)) {
