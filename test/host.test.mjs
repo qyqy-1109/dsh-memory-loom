@@ -509,3 +509,43 @@ test('模型归纳失败：摘要保持抽取式，错误只留痕不抛给写�
   assert.match(String(summaries[0].llmError ?? ''), /模型挂了/);
   await rm(dir, { recursive: true, force: true });
 });
+
+test('使用信号：下一轮说到同一条记忆的指纹词，才算「用上了」', async () => {
+  const env = await bootstrap();
+  try {
+    const preStep = env.listeners.find((entry) => entry.event === 'agent/pre-step').handler;
+    const write = env.tools.find((tool) => tool.name === 'memory_write');
+    await write.execute({ kind: 'fact', text: '用户喜欢喝手冲咖啡，不加糖' }, {});
+
+    const turn = (text) => async () => ({
+      kind: 'enter',
+      messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+    });
+    const session = { id: 's-used' };
+    const step = (turnNo) => ({ agent: { session }, step: 1, turn: turnNo, signal: { aborted: false } });
+    const read = async () => JSON.parse(await readFile(join(env.dir, 'memory-loom', 'store.json'), 'utf8'));
+
+    // 第一轮：查询命中那条记忆 → 注入，并把指纹存下来
+    await preStep(step(1), turn('咖啡 手冲 不加糖 哪个更好'));
+    // 第二轮：聊别的 → 不该记 used（但这份注入还没结案，后面几轮仍可验收）
+    await preStep(step(2), turn('今天天气怎么样'));
+    assert.equal((await read()).memories[0].usedCount ?? 0, 0, '没提到就不算用上');
+
+    // 第三轮：复述指纹词 → 记一次 used
+    await preStep(step(3), turn('还是手冲咖啡吧，不加糖'));
+    const after = await read();
+    assert.equal(after.memories[0].usedCount, 1, '说到同一条的指纹词才算用上');
+    // 两把尺子分开：used 记上了，hits 记的是"被注入"，本来也该涨
+    assert.ok((after.memories[0].hits ?? 0) >= 1, 'hits 是另一把尺子');
+
+    // 第四轮：每份注入各记一次 —— 第三轮自己也注入了一份，所以这里再记一次是对的
+    await preStep(step(4), turn('又是手冲咖啡，还是不加糖'));
+    assert.equal((await read()).memories[0].usedCount, 2, '新的那份注入被用上，再记一次');
+    // 但没有新注入的空转轮次不该继续加
+    const before = (await read()).memories[0].usedCount;
+    await preStep(step(5), turn('嗯'));
+    assert.equal((await read()).memories[0].usedCount, before, '没注入就没有可验收的东西');
+  } finally {
+    await env.cleanup();
+  }
+});
