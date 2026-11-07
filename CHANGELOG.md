@@ -3,6 +3,15 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.39.3] - 2026-11-07
+
+### 诊断
+- 时间轴仍然"打开闪一下就消失"，但重启后现象不变 —— 说明不是陈旧样式。为了不再靠猜，
+  打开面板时把**实际几何数据**回报给宿主：舞台 / 画布 / 时间轴各自的高度、舞台的
+  `grid-template-rows`、`display`、`overflow`，以及视口尺寸，在 0.3s 与 2.5s 各记一次，
+  写进 `$DSH_HOME/memory-loom/client-diag.log`（`kind: "layout"`）。
+  自检本身包在 try/catch 里，失败绝不影响渲染。
+
 ## [0.39.2] - 2026-11-07
 
 ### 修正
