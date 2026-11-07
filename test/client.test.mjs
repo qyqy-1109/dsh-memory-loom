@@ -778,3 +778,36 @@ test('光效：每颗星多一层柔光，bloom 只在最高画质档开，且�
   const perFrameMs = Number(process.hrtime.bigint() - started) / 1e6 / frames;
   assert.ok(perFrameMs < 8, `光效模式每帧成本应低于 8ms，实测 ${perFrameMs.toFixed(3)}ms`);
 });
+
+test('云层：每簇一张烘焙云，按深度从远到近画，低画质不出云', async () => {
+  const client = await loadClient();
+  const { clusterCloudPlan, paintClusterClouds, cloudSprite } = client.__internals;
+  const mk = (cluster, x, y, depth) => ({
+    x,
+    y,
+    depth,
+    f: 1,
+    ghost: false,
+    point: { id: `${cluster}-${x}`, cluster, rgb: [138, 180, 255] },
+  });
+  const projected = [mk('a', 100, 100, 2200), mk('b', 400, 300, 800), mk('c', 700, 500, 1500)];
+
+  const plan = clusterCloudPlan(projected, 900, 600, { quality: 2 });
+  assert.equal(plan.length, 3);
+  assert.deepEqual(plan.map((cloud) => cloud.cluster), ['a', 'c', 'b'], '必须从远到近：远处的云先画');
+  assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 1 }).length, 0, '掉档时不出云（整屏填充太大）');
+  for (const cloud of plan) assert.ok(cloud.radius >= 120 && cloud.radius <= 760, '云半径要有上下限');
+
+  const counters = { drawImage: 0 };
+  const ctx = makeFakeCtx(counters);
+  const drawn = paintClusterClouds(ctx, projected, 900, 600, { quality: 2, time: 1000 });
+  assert.equal(drawn, 3, '每簇一张云');
+  assert.equal(counters.drawImage, 3);
+  assert.equal(ctx.globalCompositeOperation, 'source-over', '画完要把合成模式还原，否则后面的星会被叠亮');
+
+  // 精灵按簇缓存：同键同实例、尺寸固定
+  const spriteA = cloudSprite([138, 180, 255], 'k1');
+  const spriteB = cloudSprite([138, 180, 255], 'k1');
+  assert.equal(spriteA, spriteB, '同一簇的云必须复用同一张烘焙图');
+  assert.equal(spriteA.width, 256);
+});
