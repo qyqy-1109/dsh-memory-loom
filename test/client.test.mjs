@@ -849,3 +849,39 @@ test('深空底：满分辨率烘焙、铺大量星尘，且用完把合成模�
   assert.ok(dots.length < 900, `碎光不能密到抢戏，实际 ${dots.length} 个`);
   assert.equal(ctx.globalCompositeOperation, 'source-over', '画完要把加性合成还原');
 });
+
+test('焦点模式：没命中的云与标签也要一起压暗', async () => {
+  const client = await loadClient();
+  const { clusterCloudPlan, paintLabels, pickLabelCandidates, projectAll, layoutSea, CAM_DEFAULT } = client.__internals;
+  const mk = (cluster, x, y, depth, id) => ({ x, y, depth, f: 1, ghost: false, point: { id, cluster, rgb: [138, 180, 255] } });
+  const projected = [mk('a', 100, 100, 900, 'a1'), mk('b', 400, 300, 900, 'b1')];
+
+  const plan = clusterCloudPlan(projected, 900, 600, { quality: 2, onlyFocus: true, focus: new Set(['a1']) });
+  const byCluster = new Map(plan.map((cloud) => [cloud.cluster, cloud.focused]));
+  assert.equal(byCluster.get('a'), true, '有命中的簇正常显示');
+  assert.equal(byCluster.get('b'), false, '没命中的簇要跟着压暗，否则按钮按下后云还亮着');
+
+  // 标签同理：非命中点的字色透明度必须显著更低
+  const { points } = layoutSea(makeMemories(40));
+  const projectedAll = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const positions = new Map(projectedAll.map((p) => [p.point.id, p]));
+  const candidates = pickLabelCandidates(points, 8);
+  const alphas = [];
+  const counters = { fillText: 0 };
+  const ctx = makeFakeCtx(counters);
+  const original = ctx.fillText;
+  ctx.fillText = function capture(...args) {
+    alphas.push(ctx.globalAlpha);
+    return original.apply(this, args);
+  };
+  paintLabels(ctx, candidates, positions, 900, 600, {
+    alphaMap: new Map(),
+    dt: 600,
+    onlyFocus: true,
+    focus: new Set([candidates[0].id]),
+  });
+  assert.ok(alphas.length >= 2, `至少要画出命中与非命中两类标签，实际 ${alphas.length}`);
+  const brightest = Math.max(...alphas);
+  const faintest = Math.min(...alphas);
+  assert.ok(faintest <= brightest * 0.3, `非命中标签应压到约 1/8，实测 ${faintest} vs ${brightest}`);
+});
