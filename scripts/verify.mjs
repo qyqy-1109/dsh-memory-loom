@@ -276,8 +276,8 @@ await check('client: 面板是 main 槽里的一页（不用 fixed / top layer /
   const pageRule = /\.ml-page\{([^}]*)\}/.exec(source);
   if (pageRule === null) throw new Error('缺少 .ml-page 规则');
   if (/position:\s*fixed/.test(pageRule[1])) throw new Error('.ml-page 不能是 fixed 覆盖层');
-  if (!/width:100%/.test(pageRule[1]) || !/height:100%/.test(pageRule[1])) {
-    throw new Error('.ml-page 应当铺满宿主给的面板区域');
+  if (!/width:100%/.test(pageRule[1]) || !/height:(100%|var\(--ml-page-h)/.test(pageRule[1])) {
+    throw new Error('.ml-page 应当铺满宿主给的面板区域（height:100% 或 var(--ml-page-h)）');
   }
   if (/\.ml-dock\{/.test(source)) throw new Error('不应再有右侧栏容器');
 });
