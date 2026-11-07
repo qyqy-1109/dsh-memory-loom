@@ -886,6 +886,36 @@ test('呼吸光：逐星不同相位/周期，振幅有界，关掉就不动', a
   assert.ok(changed > 10, `柔光透明度应随时间变化，实测只有 ${changed} 个点变了`);
 });
 
+test('呼吸光必须"看得见"：柔光尺寸要胀缩一成以上，透明度要变化两成以上', async () => {
+  const client = await loadClient();
+  const { layoutSea, projectAll, paintPoints, CAM_DEFAULT } = client.__internals;
+  const { points } = layoutSea(makeMemories(20));
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const capture = (time) => {
+    const draws = [];
+    const ctx = makeFakeCtx({});
+    const original = ctx.drawImage;
+    ctx.drawImage = function record(...args) {
+      draws.push({ alpha: ctx.globalAlpha, width: args[3] });
+      return original.apply(this, args);
+    };
+    paintPoints(ctx, projected, { quality: 2, halo: true, dpr: 1, time });
+    return draws;
+  };
+  // 覆盖一个以上完整周期（周期 2.8–5.4s）
+  const samples = [0, 700, 1400, 2100, 2800, 3500, 4200].map(capture);
+  // 取第一颗（最远的那颗）：它没有热点加成，透明度不会被 1.0 截断，采样才看得出变化；
+  // 注意绘制顺序是「先全部柔光、再全部实体」，所以第 0 个 drawImage 才是柔光层
+  const index = 0;
+  const widths = samples.map((draws) => draws[index].width);
+  const alphaValues = samples.map((draws) => draws[index].alpha);
+  const widthRatio = Math.max(...widths) / Math.min(...widths);
+  const alphaRatio = Math.max(...alphaValues) / Math.min(...alphaValues);
+  // 上一版振幅 10%、周期近 7 秒，在暗背景上等于静止 —— 这条就是防它回归
+  assert.ok(widthRatio > 1.1, `柔光尺寸涨缩应超过 10%，实测 ${((widthRatio - 1) * 100).toFixed(1)}%`);
+  assert.ok(alphaRatio > 1.2, `柔光透明度变化应超过 20%，实测 ${((alphaRatio - 1) * 100).toFixed(1)}%`);
+});
+
 test('焦点模式：没命中的云与标签也要一起压暗', async () => {
   const client = await loadClient();
   const { clusterCloudPlan, paintLabels, pickLabelCandidates, projectAll, layoutSea, CAM_DEFAULT } = client.__internals;
