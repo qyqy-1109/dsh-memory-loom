@@ -154,6 +154,62 @@ test('关键词：中文二元组、去停用词、限条数', async () => {
   assert.deepEqual(client.__internals.keywordsOf(''), []);
 });
 
+test('布局按簇大小分配体积：大簇不挤、簇与簇不重叠', async () => {
+  const client = await loadClient();
+  const { layoutSea } = client.__internals;
+  const memories = [];
+  for (let index = 0; index < 24; index += 1) {
+    memories.push({ id: `big-${index}`, kind: 'fact', text: `大簇第 ${index} 条结论`, scene: '大簇', createdAt: index });
+  }
+  for (let index = 0; index < 5; index += 1) {
+    memories.push({ id: `small-${index}`, kind: 'fact', text: `小簇第 ${index} 条结论`, scene: `小簇${index}`, createdAt: index });
+  }
+  const { points } = layoutSea(memories);
+  const byCluster = new Map();
+  for (const point of points) {
+    const list = byCluster.get(point.cluster) ?? [];
+    list.push(point);
+    byCluster.set(point.cluster, list);
+  }
+  const big = byCluster.get('大簇');
+  assert.equal(big.length, 24);
+
+  // 大簇内部不能挤成一坨：最近的两颗也要拉开一段距离
+  let nearest = Infinity;
+  for (let i = 0; i < big.length; i += 1) {
+    for (let j = i + 1; j < big.length; j += 1) {
+      const distance = Math.hypot(big[i].x - big[j].x, big[i].y - big[j].y, big[i].z - big[j].z);
+      if (distance < nearest) nearest = distance;
+    }
+  }
+  assert.ok(nearest > 10, `大簇内最近两颗太挤：${nearest.toFixed(1)}`);
+
+  // 簇心之间不能重叠：任意两簇的球心距 ≥ 两者体积半径之和
+  const radiusOfCluster = (list) => Math.max(...list.map((point) => Math.hypot(point.x, point.y, point.z)));
+  const clusters = [...byCluster.entries()];
+  for (let i = 0; i < clusters.length; i += 1) {
+    for (let j = i + 1; j < clusters.length; j += 1) {
+      const [nameA, listA] = clusters[i];
+      const [nameB, listB] = clusters[j];
+      const centerA = { x: 0, y: 0, z: 0 };
+      for (const point of listA) {
+        centerA.x += point.x / listA.length;
+        centerA.y += point.y / listA.length;
+        centerA.z += point.z / listA.length;
+      }
+      const centerB = { x: 0, y: 0, z: 0 };
+      for (const point of listB) {
+        centerB.x += point.x / listB.length;
+        centerB.y += point.y / listB.length;
+        centerB.z += point.z / listB.length;
+      }
+      const gap = Math.hypot(centerA.x - centerB.x, centerA.y - centerB.y, centerA.z - centerB.z);
+      const need = radiusOfCluster(listA) * 0.55 + radiusOfCluster(listB) * 0.55;
+      assert.ok(gap > need * 0.6, `簇 ${nameA} 与 ${nameB} 叠在一起了：间距 ${gap.toFixed(1)}`);
+    }
+  }
+});
+
 test('三维布局：同一批数据两次布局完全一致，且落在合理半径内', async () => {
   const client = await loadClient();
   const memories = makeMemories(120);
