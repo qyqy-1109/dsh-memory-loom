@@ -3,6 +3,17 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.30.7] - 2026-11-07
+
+### 修正
+- **版本不一致要说出来**：`/api/state` 现在带 `serverVersion`，与面板 `CLIENT_VERSION` 不一致时页脚直接显示
+  「宿主 vX ≠ 面板 vY，重启 DSH」。起因是一次真实的困惑：页面刷新只换了 client bundle，
+  宿主的插件实例还是旧代码，点「导出」只得到一个裸的 `HTTP 404`。
+- 面板里 404 一律翻成人话：`宿主 vX 比面板 vY 旧：重启 DSH 后这个按钮才会生效`。
+
+### 文档
+- 明确写清重载边界：**改 `lib/` 后要重启 DSH**（client bundle 刷新页面即可，服务端路由不会随页面刷新重挂）。
+
 ## [0.30.6] - 2026-11-07
 
 ### 新增

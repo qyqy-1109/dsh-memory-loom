@@ -331,3 +331,8 @@ MIT，见 [LICENSE](LICENSE)。
 欢迎 issue / PR。改动前请先跑 `node --test "test/*.test.mjs"`（本机有 DSH 时再跑
 `node scripts/verify.mjs`）；新增行为请带一条会失败的测试，测试必须把 `storePath`
 指到临时目录 —— 用默认路径会写进真实记忆库。
+
+**改完怎么生效（踩过的坑）**：`lib/client.js` 刷新页面即可；`lib/index.js` 等宿主侧文件
+**必须重启 DSH** —— 页面刷新只会换 client bundle，插件实例与它的路由还是旧代码。
+版本对不上时面板页脚会直接写出来（`宿主 vX ≠ 面板 vY，重启 DSH`），面板里点按钮报的 404
+也会翻成「宿主比面板旧，重启后生效」。

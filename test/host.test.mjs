@@ -214,6 +214,8 @@ test('HTTP：GET /memory-loom/api/state 返回快照与六层健康，且 no-sto
     assert.equal(payload.health.layers.length, 6);
     assert.equal(payload.counts.active, 0);
     assert.ok(typeof payload.file === 'string' && payload.file.includes('memory-loom'));
+    // 面板要靠它发现「宿主还是旧代码」：版本对不上时，导出的 404 才有可读的解释
+    assert.equal(payload.serverVersion, JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf8')).version);
     const fileStat = await stat(payload.file).catch(() => null);
     assert.notEqual(fileStat, null, '读取状态后应已建库文件');
   } finally {
