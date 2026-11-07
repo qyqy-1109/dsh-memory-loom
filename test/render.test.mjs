@@ -322,6 +322,45 @@ test('页面：记忆海铺满内容区，页头/侧栏/页脚与星图都在', 
   assert.deepEqual(texts.filter(Boolean), [], '页面上不应再有返回按钮');
 });
 
+test('星图：时间轴（回放滑杆）必须在，不能被布局挤掉', async () => {
+  installDom();
+  // 星图的主循环用 rAF 自驱动；默认桩会同步回调 → 递归爆栈，这里改成只登记不执行
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+  const { loaded, hooks } = await loadPlugin();
+  const page = captureComponent(loaded, 'main');
+  const { tree } = renderRoot(page, hooks);
+  const sea = findAll(tree, isMemorySea)[0];
+  assert.notEqual(sea, undefined, '页面里应有星图组件');
+  const memories = [
+    { id: 'm1', kind: 'fact', text: '第一条', createdAt: 1000, status: 'active', hits: 0, supersedes: [] },
+    { id: 'm2', kind: 'fact', text: '第二条', createdAt: 2000, status: 'active', hits: 0, supersedes: [] },
+  ];
+  const { tree: seaTree, errors } = renderRoot(
+    () =>
+      sea.type({
+        memories,
+        dataKey: 'k',
+        selectedId: null,
+        onSelect: () => {},
+        stressToken: 0,
+        onStressReport: () => {},
+        animate: true,
+        scrubAt: null,
+        onScrub: () => {},
+        focusIds: new Set(),
+      }),
+    hooks,
+  );
+  assert.deepEqual(errors.map((failure) => failure.message), [], '星图渲染与 effect 都不能抛错');
+  const byClass = (name) => findAll(seaTree, (node) => String(node.props?.className ?? '').split(' ').includes(name));
+  // 上一版这条被 flex 压缩到 0 高度，整条时间轴凭空消失 —— 现在有测试盯着
+  assert.equal(byClass('ml-scrub').length, 1, '时间轴不能消失');
+  const ranges = findAll(seaTree, (node) => node.type === 'input' && node.props?.type === 'range');
+  assert.ok(ranges.length >= 1, '时间轴的滑杆必须存在');
+  assert.equal(ranges[0].props.max > ranges[0].props.min, true, '回放区间必须有跨度');
+});
+
 test('侧栏入口：是宿主导航栏里的一项，图标随尺寸与选中态变化', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();

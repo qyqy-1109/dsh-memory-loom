@@ -3,6 +3,19 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.39.1] - 2026-11-07
+
+### 修正
+- **时间轴（回放滑杆）消失**：`.ml-main` 是 grid 但没有声明行高，行高会按内容撑开；
+  `.ml-stage` 又是 `overflow:hidden`，于是底部那条时间轴被挤出可视区裁掉。
+  现在 `grid-template-rows:minmax(0,1fr)` 把行钉在容器高度上，右侧栏改为内部滚动；
+  另外给 `.ml-scrub` 加 `flex:none` —— 底部这条被 flex 压缩到 0 就等于"时间轴不见了"。
+- 顺手修掉一个一直在抛的 ReferenceError：星图的精灵预热 effect 里还判断 `if (!open)`，
+  那是浮层时代的开关，改成 main 页之后 `open` 早就不存在 —— 每次挂载都会抛一次（宿主吞掉了，
+  但确实在抛）。现在改成挂载后预热。
+- 新增渲染用例：星图单独渲染时，时间轴与滑杆必须存在、回放区间必须有跨度
+  （纯组件树断言，配合上面的 CSS 修复一起防回归）。
+
 ## [0.39.0] - 2026-11-07
 
 ### 新增
