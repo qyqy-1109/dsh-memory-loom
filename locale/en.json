@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Memory Loom",
+    "description": "Cross-session memory with governed writes and per-turn recall, plus a visual panel for the memory map, layer health, and recall trail."
+  }
+}

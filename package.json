@@ -1,0 +1,65 @@
+{
+  "name": "dsh-memory-loom",
+  "version": "0.30.3",
+  "description": "可视化的跨会话记忆层：四层记忆、写路径治理、按当前输入召回注入。",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qyqy-1109/dsh-memory-loom.git"
+  },
+  "homepage": "https://github.com/qyqy-1109/dsh-memory-loom#readme",
+  "bugs": {
+    "url": "https://github.com/qyqy-1109/dsh-memory-loom/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "locale/*.json",
+    "icon.svg",
+    "cordis.patch.yml",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "verify": "node scripts/verify.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "cross-session",
+    "memory-plugin"
+  ],
+  "author": "卿云秋月",
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

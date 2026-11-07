@@ -1,0 +1,17 @@
+# 依赖（插件本身零运行时依赖，这里只防误提交）
+node_modules/
+
+# 日志与临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 记忆库本体与备份：这是用户数据，绝不能进仓库
+store.json
+store.json.bak-*
+*.bak-*
+
+# 测试/调试产物
+coverage/
+*.lcov

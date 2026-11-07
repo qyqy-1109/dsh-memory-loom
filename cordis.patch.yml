@@ -1,0 +1,6 @@
+# dsh-memory-loom 的配置层：向 profile 插入一行插件条目。
+# 后层按 id 覆盖前层，且 config 是整段替换（不是深合并）。
+- insert:
+    - id: memory-loom
+      name: dsh-memory-loom
+      config: {}
