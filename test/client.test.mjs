@@ -199,28 +199,29 @@ test('布局按簇大小分配体积：大簇不挤、簇与簇不重叠', async
   }
   assert.ok(nearest > 10, `大簇内最近两颗太挤：${nearest.toFixed(1)}`);
 
-  // 簇心之间不能重叠：任意两簇的球心距 ≥ 两者体积半径之和
-  const radiusOfCluster = (list) => Math.max(...list.map((point) => Math.hypot(point.x, point.y, point.z)));
+  // 簇心之间不能重叠：任意两簇的球心距 ≥ 两者半径之和
+  // 半径要按「到自己的簇心」算，不是「到原点」—— 簇分布在球壳上时，
+  // 到原点的距离主要是壳半径，用它当簇半径会把所有簇都算成一个巨大的球。
+  const centroidOf = (list) => {
+    const center = { x: 0, y: 0, z: 0 };
+    for (const point of list) {
+      center.x += point.x / list.length;
+      center.y += point.y / list.length;
+      center.z += point.z / list.length;
+    }
+    return center;
+  };
+  const radiusAround = (list, center) => Math.max(...list.map((point) => Math.hypot(point.x - center.x, point.y - center.y, point.z - center.z)));
   const clusters = [...byCluster.entries()];
   for (let i = 0; i < clusters.length; i += 1) {
     for (let j = i + 1; j < clusters.length; j += 1) {
       const [nameA, listA] = clusters[i];
       const [nameB, listB] = clusters[j];
-      const centerA = { x: 0, y: 0, z: 0 };
-      for (const point of listA) {
-        centerA.x += point.x / listA.length;
-        centerA.y += point.y / listA.length;
-        centerA.z += point.z / listA.length;
-      }
-      const centerB = { x: 0, y: 0, z: 0 };
-      for (const point of listB) {
-        centerB.x += point.x / listB.length;
-        centerB.y += point.y / listB.length;
-        centerB.z += point.z / listB.length;
-      }
+      const centerA = centroidOf(listA);
+      const centerB = centroidOf(listB);
       const gap = Math.hypot(centerA.x - centerB.x, centerA.y - centerB.y, centerA.z - centerB.z);
-      const need = radiusOfCluster(listA) * 0.55 + radiusOfCluster(listB) * 0.55;
-      assert.ok(gap > need * 0.6, `簇 ${nameA} 与 ${nameB} 叠在一起了：间距 ${gap.toFixed(1)}`);
+      const need = radiusAround(listA, centerA) + radiusAround(listB, centerB);
+      assert.ok(gap > need * 0.6, `簇 ${nameA} 与 ${nameB} 叠在一起了：间距 ${gap.toFixed(1)}，半径和 ${need.toFixed(1)}`);
     }
   }
 });
@@ -1133,6 +1134,36 @@ test('共激活线：关系变多变强时按 maxEdges 截断，不给帧率添�
   assert.equal(buildRecallEdges(points, list, { maxEdges: 5 }).length, 5);
   assert.deepEqual(buildRecallEdges(points, []), []);
   assert.deepEqual(buildRecallEdges(points, null), []);
+});
+
+test('屏幕上不能有两颗星糊在一起：撒点用低差异分布，投影后仍然分得开', async () => {
+  const client = await loadClient();
+  const { layoutSea, projectAll, CAM_DEFAULT } = client.__internals;
+  // 贴着真实库的形状：一个 40 条的大簇（world）+ 六个 8 条的小簇
+  const memories = [];
+  for (let index = 0; index < 40; index += 1) {
+    memories.push({ id: `w-${index}`, kind: 'world', text: `世界第 ${index} 条`, createdAt: index, hits: index % 5, status: 'active' });
+  }
+  for (let cluster = 0; cluster < 6; cluster += 1) {
+    for (let index = 0; index < 8; index += 1) {
+      memories.push({ id: `c${cluster}-${index}`, kind: 'fact', text: `簇${cluster} 第 ${index} 条`, createdAt: 100 + index, hits: 0, status: 'active', scene: `场景${cluster}` });
+    }
+  }
+  const { points } = layoutSea(memories);
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 1100, 700, 0, false, null);
+  let under6 = 0;
+  let nearest = Infinity;
+  for (let i = 0; i < projected.length; i += 1) {
+    for (let j = i + 1; j < projected.length; j += 1) {
+      const distance = Math.hypot(projected[i].x - projected[j].x, projected[i].y - projected[j].y);
+      if (distance < 6) under6 += 1;
+      if (distance < nearest) nearest = distance;
+    }
+  }
+  // 旧的「球内均匀随机」实现：同样规模下有 20 多对糊在一起，最极端 0.5px（两颗星完全重合）。
+  // 重叠不是美观问题：两条记忆只点得到一条，而点星看原文是这张图唯一的入口。
+  assert.ok(under6 <= 6, `糊在一起的星太多：<6px 有 ${under6} 对`);
+  assert.ok(nearest > 1.5, `最近的一对只差 ${nearest.toFixed(2)}px，等于一颗星`);
 });
 
 test('共激活线：单独一色单独一桶，能整类关掉，且不污染金线与相似度线', async () => {
