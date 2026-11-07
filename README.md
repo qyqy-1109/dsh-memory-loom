@@ -2,6 +2,8 @@
 
 给 **DeepSeek Harness** 用的跨会话记忆插件：写入有治理，读取出注入，状态可视。
 
+> English: [README.en.md](README.en.md)（面板文案 zh/en 双语，记忆内容保持你写的原文）
+
 设计直接搬自「旧识（old-acquaintance）」那套记忆架构，但按 DSH 的宿主能力重新落地 ——
 不是把 Python 服务搬过来，而是把**口径**搬过来：
 
@@ -40,6 +42,15 @@ dsh plugin --profile desktop add .
 装完在左侧导航栏会多出「记忆海」一项，和「插件」「自动化任务」同一列。
 
 也可以直接给绝对路径：`dsh plugin --profile desktop add /path/to/dsh-memory-loom`。
+
+### 从 npm 装（可选）
+
+仓库自带 `.github/workflows/publish.yml`：在 GitHub 上打 tag（`v0.30.6` 这种）就会跑测试并
+`npm publish`，需要先在仓库 Secrets 里配 `NPM_TOKEN`。发过之后可以一行装：
+
+```sh
+dsh plugin --profile desktop add dsh-memory-loom
+```
 
 ## 三层防爆（v0.22.0）
 
@@ -193,6 +204,8 @@ dsh plugin --profile desktop add .
 - **整理过程记录**（v0.30.5）：侧栏「整理」把「v0.30.1 修了什么」这类 changelog 式条目批量归档
   （先预览条数，再确认）。只归档不删除 —— `reason: bulk-log` 可单条恢复；只动 fact / self / episode，
   `explicit`（你亲口说的）一条不碰。
+- **双语界面**（v0.30.6）：`window.navigator.language` 不是 `zh-*` 时，页签 / 按钮 / 页脚 / 种类与状态词
+  走英文；字典缺词就原样回落中文（宁可中文，也不要空标签）。记忆正文与注入块不翻译。
 
 布局与投影参数直接对齐参考实现（[asdfd3/3d-memory-sea](https://github.com/asdfd3/3d-memory-sea)）：
 焦距 1100、初始距离 1200、俯仰 -0.30、相机距离夹在 380–3200。
@@ -274,8 +287,8 @@ explicit 通道的等价物，且这类条目不参与容量淘汰。
 ## 验证
 
 ```sh
-node --test "test/*.test.mjs"   # 90 条：分词/日期/查重/取代/槽位/淘汰/召回/摘要/导出导入/持久化/接线/HTTP
-node scripts/verify.mjs         # 24 项：用本机真实 dsh-tools 校验 schema 子集，并跑通 client bundle 的槽位注册
+node --test "test/*.test.mjs"   # 93 条：分词/日期/查重/取代/槽位/淘汰/召回/摘要/导出导入/整理/双语/持久化/接线/HTTP
+node scripts/verify.mjs         # 25 项：用本机真实 dsh-tools 校验 schema 子集，并跑通 client bundle 的槽位注册
 ```
 
 `verify.mjs` 校验的是**本机安装的 DSH 运行时**，所以它需要找得到那份 `node_modules`：

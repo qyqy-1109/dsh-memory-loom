@@ -148,6 +148,14 @@ await check('host: 导出/导入路由都在（面板的两个管理动作）', 
 // ── ② client bundle 在模块加载器契约下真的注册了插槽 ──
 const source = await readFile(join(process.cwd(), 'lib', 'client.js'), 'utf8');
 
+await check('client: 页脚版本与 package.json 一致', async () => {
+  // 页脚上那个版本号是给人核对「页面到底跑哪一版」的，漂了就等于没有
+  const pkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf8'));
+  if (!source.includes(`CLIENT_VERSION = '${pkg.version}'`)) {
+    throw new Error(`页脚版本与包版本不一致：package.json 是 ${pkg.version}`);
+  }
+});
+
 await check('client: 面板有导出/导入入口（导入要二次确认）', () => {
   if (!source.includes('/memory-loom/api/export')) throw new Error('面板没有导出入口');
   if (!source.includes("postAction('import'")) throw new Error('面板没有导入入口');

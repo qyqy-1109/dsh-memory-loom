@@ -3,6 +3,19 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.30.6] - 2026-11-07
+
+### 新增
+- **双语界面**：`window.navigator.language` 不是 `zh-*` 时，页签 / 按钮 / 页脚 / 种类与状态词 / 空状态 /
+  侧栏入口走英文；字典缺词原样回落中文。记忆正文与注入块不翻译（翻不准，也不该翻）。
+  字典内联在 client bundle 里 —— 没有打包器，bundle 里 import 不了兄弟模块。
+- `README.en.md`（英文说明），中文 README 顶部互相链接。
+- `.github/workflows/publish.yml`：打 tag 跑测试并 `npm publish --provenance`，配 `NPM_TOKEN` 即可。
+
+### 修正
+- 面板页脚版本号改成每版跟着 `package.json` 走，并在 `verify.mjs` 里加了门禁 ——
+  之前它停在 `0.16.8`，又漂到 `0.30.3`，对不上包版本。
+
 ## [0.30.5] - 2026-11-07
 
 ### 新增

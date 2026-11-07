@@ -575,3 +575,20 @@ test('回放时间归一：undefined / NaN / null 都当「全部」', async () 
   assert.equal(client.__internals.asScrubTime(0), 0);
   assert.equal(client.__internals.asScrubTime(1_700_000_000_000), 1_700_000_000_000);
 });
+
+test('界面语言：英文环境翻 chrome、缺词回落中文、测试环境默认中文', async () => {
+  const client = await loadClient();
+  const { detectLocale, translateWith, UI_LOCALE, EN_TEXT } = client.__internals;
+  assert.equal(detectLocale({ language: 'zh-CN' }), 'zh');
+  assert.equal(detectLocale({ language: 'en-US' }), 'en');
+  assert.equal(detectLocale(null), 'zh', '拿不到 navigator 时保守用中文');
+  assert.equal(detectLocale({}), 'zh');
+
+  assert.equal(translateWith('en', '记忆库'), 'Library');
+  assert.equal(translateWith('en', '整理'), 'Tidy');
+  assert.equal(translateWith('en', '这条还没进字典'), '这条还没进字典', '缺词要原样返回，不能变成空标签');
+  assert.equal(translateWith('zh', '记忆库'), '记忆库', '中文环境一个字都不该变');
+
+  assert.equal(UI_LOCALE, 'zh', '测试环境没有 window.navigator，默认中文');
+  assert.ok(Object.keys(EN_TEXT).length >= 30, '字典至少覆盖页签/按钮/页脚/种类/状态');
+});

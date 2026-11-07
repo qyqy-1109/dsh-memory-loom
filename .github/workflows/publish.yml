@@ -1,0 +1,26 @@
+name: publish
+
+# 打 tag（v0.30.6 这种）就发一版到 npm；发布前先把测试跑一遍。
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # 插件零运行时依赖，不需要 install
+      - name: test
+        run: node --test test/*.test.mjs
+      - name: publish
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
