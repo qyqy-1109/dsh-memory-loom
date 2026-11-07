@@ -809,7 +809,7 @@ test('云层：每簇一张烘焙云，按深度从远到近画，低画质不�
   assert.equal(plan.length, 3);
   assert.deepEqual(plan.map((cloud) => cloud.cluster), ['a', 'c', 'b'], '必须从远到近：远处的云先画');
   assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 1 }).length, 0, '掉档时不出云（整屏填充太大）');
-  for (const cloud of plan) assert.ok(cloud.radius >= 110 && cloud.radius <= 520, '云半径要有上下限（太大就是一团雾）');
+  for (const cloud of plan) assert.ok(cloud.radius >= 100 && cloud.radius <= 440, '云半径要有上下限（太大就是一团雾）');
 
   const counters = { drawImage: 0 };
   const ctx = makeFakeCtx(counters);
@@ -843,7 +843,9 @@ test('深空底：满分辨率烘焙、铺大量星尘，且用完把合成模�
   assert.equal(canvas.width, Math.round((800 + 24) * 1.5));
   assert.equal(canvas.height, Math.round((500 + 24) * 1.5));
   // 星尘数量按面积走：800×500 应铺出上千颗 1px 级别的点
+  // 碎光必须**稀疏**：上一版铺了上千颗，背景自己就成了一张星图，把记忆星压下去了
   const dots = fills.filter(([, , w, h]) => w <= 3 && h <= 3);
-  assert.ok(dots.length > 1500, `星尘要铺得够密才像深空，实际 ${dots.length} 个`);
+  assert.ok(dots.length > 100, `要有点碎光，实际 ${dots.length} 个`);
+  assert.ok(dots.length < 900, `碎光不能密到抢戏，实际 ${dots.length} 个`);
   assert.equal(ctx.globalCompositeOperation, 'source-over', '画完要把加性合成还原');
 });
