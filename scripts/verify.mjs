@@ -137,8 +137,22 @@ await check('host: 注册了 agent/pre-step 监听', () => {
   if (!captured.listeners.some((entry) => entry.event === 'agent/pre-step')) throw new Error('missing pre-step listener');
 });
 
+await check('host: 导出/导入路由都在（面板的两个管理动作）', async () => {
+  // 面板只发请求，路由漏挂就是「按钮点了没反应」，所以静态盯一眼
+  const indexSource = await readFile(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  for (const branch of ["route === 'api/export'", "route === 'api/import'"]) {
+    if (!indexSource.includes(branch)) throw new Error(`缺少路由分支 ${branch}`);
+  }
+});
+
 // ── ② client bundle 在模块加载器契约下真的注册了插槽 ──
 const source = await readFile(join(process.cwd(), 'lib', 'client.js'), 'utf8');
+
+await check('client: 面板有导出/导入入口（导入要二次确认）', () => {
+  if (!source.includes('/memory-loom/api/export')) throw new Error('面板没有导出入口');
+  if (!source.includes("postAction('import'")) throw new Error('面板没有导入入口');
+  if (!source.includes('pendingImport')) throw new Error('导入缺少「选完文件再确认」的中间态');
+});
 
 await check('client: bundle 以 window.__ModuleLoader__.load 包装', () => {
   if (!source.includes('__ModuleLoader__.load')) throw new Error('bundle is not wrapped for the module loader');
