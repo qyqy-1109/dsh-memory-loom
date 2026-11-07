@@ -66,6 +66,20 @@ function makeFakeCtx(counters = null) {
       tick('gradient');
       return { addColorStop() {} };
     },
+    createLinearGradient() {
+      tick('gradient');
+      return { addColorStop() {} };
+    },
+    // 深空底会用到变换栈与旋转/缩放：没有这些方法时，调用会直接抛
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    scale() {},
+    createImageData(width, height) {
+      return { width, height, data: new Uint8ClampedArray(width * height * 4) };
+    },
+    putImageData() {},
   };
 }
 
@@ -93,8 +107,7 @@ async function loadClient() {
         return { width: 0, height: 0, getContext: () => makeFakeCtx(), toDataURL: (type) => `data:${type};base64,x` };
       }
       return { dataset: {}, textContent: '' };
-    },
-    head: { appendChild: () => {} },
+    },    head: { appendChild: () => {} },
     body: {},
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -796,7 +809,7 @@ test('云层：每簇一张烘焙云，按深度从远到近画，低画质不�
   assert.equal(plan.length, 3);
   assert.deepEqual(plan.map((cloud) => cloud.cluster), ['a', 'c', 'b'], '必须从远到近：远处的云先画');
   assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 1 }).length, 0, '掉档时不出云（整屏填充太大）');
-  for (const cloud of plan) assert.ok(cloud.radius >= 120 && cloud.radius <= 760, '云半径要有上下限');
+  for (const cloud of plan) assert.ok(cloud.radius >= 110 && cloud.radius <= 520, '云半径要有上下限（太大就是一团雾）');
 
   const counters = { drawImage: 0 };
   const ctx = makeFakeCtx(counters);
@@ -810,4 +823,27 @@ test('云层：每簇一张烘焙云，按深度从远到近画，低画质不�
   const spriteB = cloudSprite([138, 180, 255], 'k1');
   assert.equal(spriteA, spriteB, '同一簇的云必须复用同一张烘焙图');
   assert.equal(spriteA.width, 256);
+});
+
+test('深空底：满分辨率烘焙、铺大量星尘，且用完把合成模式还原', async () => {
+  const client = await loadClient();
+  const { paintDeepSpace } = client.__internals;
+  const ctx = makeFakeCtx({ gradient: 0 });
+  // 画布要把 ctx 缓存下来：paintDeepSpace 会自己再 getContext 一次，否则补丁打不到它用的那份
+  const canvas = { width: 0, height: 0, getContext: () => ctx };
+  const fills = [];
+  const originalFillRect = ctx.fillRect;
+  ctx.fillRect = function fillRect(x, y, w, h) {
+    fills.push([x, y, w, h]);
+    return originalFillRect.apply(this, arguments);
+  };
+
+  paintDeepSpace(canvas, 800, 500, 2, [[138, 180, 255], [192, 162, 255]]);
+  // 满分辨率（受 1.5 倍上限约束）：不能再用半分辨率放大，那正是"糊"的来源
+  assert.equal(canvas.width, Math.round((800 + 24) * 1.5));
+  assert.equal(canvas.height, Math.round((500 + 24) * 1.5));
+  // 星尘数量按面积走：800×500 应铺出上千颗 1px 级别的点
+  const dots = fills.filter(([, , w, h]) => w <= 3 && h <= 3);
+  assert.ok(dots.length > 1500, `星尘要铺得够密才像深空，实际 ${dots.length} 个`);
+  assert.equal(ctx.globalCompositeOperation, 'source-over', '画完要把加性合成还原');
 });
