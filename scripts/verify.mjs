@@ -175,6 +175,13 @@ await check('client: 拖拽按增量推进（不在 clamp 上"还债"）', () =>
   }
 });
 
+await check('client: 样式表按版本注入（否则改了 CSS 页面上看不到变化）', () => {
+  // 只按固定 id 判断"注入过没有"时，client 热重载会拿到新 JS + 旧 CSS：
+  // 表现就是"CSS 明明改了，界面还是老样子"
+  if (!source.includes('panel.css@${CLIENT_VERSION}')) throw new Error('样式表 id 必须带版本号');
+  if (!source.includes('node?.remove')) throw new Error('换版本时要把旧样式表摘掉');
+});
+
 await check('client: 列表滚下去后有「回到顶端」', () => {
   if (!source.includes('ml-top')) throw new Error('缺少回到顶端按钮的样式/类名');
   if (!source.includes('shouldShowTop(')) throw new Error('按钮显隐应当走 shouldShowTop');
