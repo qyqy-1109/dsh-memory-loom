@@ -55,6 +55,9 @@ function makeFakeCtx(counters = null) {
     fillText() {
       tick('fillText');
     },
+    strokeText() {
+      tick('strokeText');
+    },
     measureText(text) {
       if (counters !== null && typeof counters.measureText === 'number') counters.measureText += 1;
       return { width: String(text ?? '').length * 6 };
@@ -515,7 +518,7 @@ test('标签：候选按权重定序且只算一次；宽度只量一次，带�
   const camera = { ...client.__internals.CAM_DEFAULT };
   const projected = client.__internals.projectAll(points, camera, 900, 600, 0, false, null);
   const positions = new Map(projected.map((p) => [p.point.id, p]));
-  const counters = { fillText: 0, fillRect: 0, measureText: 0 };
+  const counters = { fillText: 0, fillRect: 0, measureText: 0, strokeText: 0 };
   const ctx = makeFakeCtx(counters);
   const alphaMap = new Map();
   const batch = candidates.slice(0, 8);
@@ -528,8 +531,9 @@ test('标签：候选按权重定序且只算一次；宽度只量一次，带�
   const measuredAfterFirst = counters.measureText;
   for (let frame = 0; frame < 10; frame += 1) client.__internals.paintLabels(ctx, batch, positions, 900, 600, { alphaMap, dt: 16 });
   assert.equal(counters.measureText, measuredAfterFirst, '标签宽度只该量一次');
-  assert.ok(counters.fillRect > 0, '透明度上来后应该有底衬');
-  assert.ok(counters.fillRect <= counters.fillText * 2, '每个标签最多底衬 + 引线两条矩形');
+  assert.ok(counters.fillRect > 0, '应该画引线');
+  assert.ok(counters.fillRect <= counters.fillText, '每个标签最多一条引线（不再有实心底衬方框）');
+  assert.equal(counters.strokeText, counters.fillText, '文字靠描边当底衬，每个标签各一次');
 
   // 第二帧 alpha 继续上升（淡入而不是瞬间出现）
   assert.ok((alphaMap.get(batch[0].id) ?? 0) > 0.2, '标签透明度应随时间上升');
@@ -731,4 +735,46 @@ test('高亮：召回命中的星只有光晕不画环，只有选中才画金�
   paintPoints(ctx3, [project()], { dpr: 2, quality: 2, presence: null, focus: null, selected: null, hovered: 'p1' });
   assert.equal(hoveredOnly.arc, 1);
   assert.ok(!String(hoverStrokes[0]).includes('233,192,122'), '悬停环不该用金色，免得和选中混淆');
+});
+
+test('光效：每颗星多一层柔光，bloom 只在最高画质档开，且不吃掉帧预算', async () => {
+  const client = await loadClient();
+  const { layoutSea, projectAll, paintPoints, planBloom, toneOf, CAM_DEFAULT } = client.__internals;
+
+  // 深度色调桶：远 / 中 / 近
+  assert.equal(toneOf(0.2), 0, '远处应走冷灰档');
+  assert.equal(toneOf(0.6), 1);
+  assert.equal(toneOf(1.2), 2, '近处应走提白档');
+  assert.equal(toneOf(0), 0);
+
+  // bloom 计划：光效关 或 画质不到最高档，都不跑
+  assert.equal(planBloom({ quality: 2, glow: true }).bloom, true);
+  assert.equal(planBloom({ quality: 2, glow: false }).bloom, false, '光效关掉就不该跑 bloom');
+  assert.equal(planBloom({ quality: 1, glow: true }).bloom, false, '掉帧降档时先牺牲 bloom');
+  assert.equal(planBloom({ quality: 2, glow: true }).scale, 0.25, 'bloom 走 1/4 分辨率');
+
+  const { points } = layoutSea(makeMemories(120));
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const plain = { drawImage: 0 };
+  const glowCounters = { drawImage: 0 };
+  const bloomCounters = { drawImage: 0 };
+  const drawn = paintPoints(makeFakeCtx(plain), projected, { quality: 2, halo: false, dpr: 1 });
+  paintPoints(makeFakeCtx(glowCounters), projected, { quality: 2, halo: true, dpr: 1 });
+  const bloomCtx = makeFakeCtx(bloomCounters);
+  paintPoints(makeFakeCtx({ drawImage: 0 }), projected, { quality: 2, halo: true, dpr: 1, bloomCtx });
+
+  assert.equal(drawn, projected.length, '每个可见点都要画');
+  assert.equal(plain.drawImage, drawn, '朴素模式：一点一次');
+  assert.equal(glowCounters.drawImage, drawn * 2, '光效模式：柔光 + 实体各一次');
+  assert.equal(bloomCounters.drawImage, drawn, 'bloom 层也要各画一次柔光');
+
+  // 性能：120 点 × 120 帧的光效模式必须远低于一帧预算
+  const ctx = makeFakeCtx({ drawImage: 0 });
+  const frames = 120;
+  const started = process.hrtime.bigint();
+  for (let frame = 0; frame < frames; frame += 1) {
+    paintPoints(ctx, projected, { quality: 2, halo: true, dpr: 1, time: frame * 16 });
+  }
+  const perFrameMs = Number(process.hrtime.bigint() - started) / 1e6 / frames;
+  assert.ok(perFrameMs < 8, `光效模式每帧成本应低于 8ms，实测 ${perFrameMs.toFixed(3)}ms`);
 });

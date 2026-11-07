@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-loom",
-  "version": "0.31.2",
+  "version": "0.32.0",
   "description": "可视化的跨会话记忆层：四层记忆、写路径治理、按当前输入召回注入。",
   "repository": {
     "type": "git",
