@@ -886,6 +886,29 @@ test('呼吸光：逐星不同相位/周期，振幅有界，关掉就不动', a
   assert.ok(changed > 10, `柔光透明度应随时间变化，实测只有 ${changed} 个点变了`);
 });
 
+test('呼吸模式：逐星 / 只亮命中 / 整片同步 / 关，四种语义不能串味', async () => {
+  const client = await loadClient();
+  const { pulseFor, breathAmplitude } = client.__internals;
+  const t = 1700;
+  // 逐星：命中与非命中都在动，但相位不同
+  const starHit = pulseFor('stars', t, 0.4, true);
+  const starPlain = pulseFor('stars', t, 2.2, false);
+  assert.notEqual(starHit, 0);
+  assert.notEqual(starPlain, 0);
+  assert.notEqual(starHit, starPlain, '逐星模式的相位必须不同');
+  // 只亮命中：非命中必须完全静止
+  assert.ok(Math.abs(pulseFor('focus', t, 2.2, false)) < 1e-12, '只亮命中时其余星必须静止');
+  assert.notEqual(pulseFor('focus', t, 0.4, true), 0, '命中的星仍要呼吸');
+  // 整片：所有点同相位（同一时刻同一个值）
+  assert.equal(pulseFor('sea', t, 0.4, false), pulseFor('sea', t, 5.1, true), '整片模式必须同步');
+  // 关：恒为 0
+  assert.equal(pulseFor('off', t, 0.4, true), 0);
+  // 幅度：整片最克制，命中最大
+  assert.ok(breathAmplitude('sea', false) < breathAmplitude('stars', false));
+  assert.ok(breathAmplitude('stars', false) < breathAmplitude('stars', true));
+  assert.equal(breathAmplitude('off', true), 0);
+});
+
 test('呼吸光必须"看得见"：柔光尺寸要胀缩一成以上，透明度要变化两成以上', async () => {
   const client = await loadClient();
   const { layoutSea, projectAll, paintPoints, CAM_DEFAULT } = client.__internals;
