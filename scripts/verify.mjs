@@ -156,6 +156,13 @@ await check('client: 页脚版本与 package.json 一致', async () => {
   }
 });
 
+await check('client: 星图点选走 focusFromStar，且点击判定不依赖残留标记', () => {
+  // 这两个都是踩过的坑：点星被上一次拖动的残留标记吞掉；点了星却因为筛选看不到那一行
+  if (!source.includes('onSelect: focusFromStar')) throw new Error('星图点选没有接到 focusFromStar');
+  if (!source.includes('isClickGesture(')) throw new Error('点击判定应当用 isClickGesture（位移+时长现算）');
+  if (/if \(model\.dragMoved\) \{/.test(source)) throw new Error('还在用 dragMoved 做点击判定：拖动后第一次点击会被吞');
+});
+
 await check('client: 面板有导出/导入入口（导入要二次确认）', () => {
   if (!source.includes('/memory-loom/api/export')) throw new Error('面板没有导出入口');
   if (!source.includes("postAction('import'")) throw new Error('面板没有导入入口');

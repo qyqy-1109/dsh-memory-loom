@@ -592,3 +592,50 @@ test('界面语言：英文环境翻 chrome、缺词回落中文、测试环境�
   assert.equal(UI_LOCALE, 'zh', '测试环境没有 window.navigator，默认中文');
   assert.ok(Object.keys(EN_TEXT).length >= 30, '字典至少覆盖页签/按钮/页脚/种类/状态');
 });
+
+test('点击手势：抖动算点击，拖过头或按太久不算，且不留跨事件状态', async () => {
+  const client = await loadClient();
+  const { isClickGesture } = client.__internals;
+  assert.equal(isClickGesture(null, { x: 10, y: 10 }), true, '没有按下记录时按点击处理');
+  assert.equal(isClickGesture({ x: 100, y: 100, t: 0 }, { x: 102, y: 101 }), true, '3px 抖动仍然是点击');
+  assert.equal(isClickGesture({ x: 100, y: 100, t: 0 }, { x: 120, y: 100 }), false, '拖了 20px 不算点击');
+  assert.equal(isClickGesture({ x: 100, y: 100, t: 1000 }, { x: 100, y: 100 }, 5000), false, '按住 4 秒不算点击');
+  // 回归点：上一次拖动不能影响下一次点击 —— 纯函数、没有残留标记，两次调用互不影响
+  assert.equal(isClickGesture({ x: 100, y: 100, t: 1000 }, { x: 100, y: 100 }, 1200), true);
+  assert.equal(isClickGesture({ x: 100, y: 100, t: 2000 }, { x: 100, y: 100 }, 2100), true);
+});
+
+test('点星定位：归档 / 种类 / 文本 / 摘要聚焦该放开的都放开', async () => {
+  const client = await loadClient();
+  const { revealFiltersFor } = client.__internals;
+  const base = { statusFilter: 'active', kindFilter: 'all', textFilter: '', summaryFocus: null };
+
+  assert.deepEqual(revealFiltersFor({ kind: 'fact', status: 'active' }, base), {
+    statusFilter: 'active',
+    kindFilter: 'all',
+    clearText: false,
+    clearSummaryFocus: false,
+  });
+
+  assert.equal(
+    revealFiltersFor({ kind: 'fact', status: 'archived' }, base).statusFilter,
+    'all',
+    '星图画的是全部记忆，归档星在"只活跃"下看不到 —— 必须放开',
+  );
+  assert.equal(
+    revealFiltersFor({ kind: 'world', status: 'active' }, { ...base, kindFilter: 'fact' }).kindFilter,
+    'all',
+    '种类过滤会把目标挡掉',
+  );
+  const focused = revealFiltersFor({ kind: 'fact', status: 'active' }, { ...base, textFilter: '关键词', summaryFocus: 's1' });
+  assert.equal(focused.clearText, true);
+  assert.equal(focused.clearSummaryFocus, true);
+
+  // 目标本来可见时一个字都不动
+  assert.deepEqual(revealFiltersFor({ kind: 'fact', status: 'active' }, { statusFilter: 'all', kindFilter: 'fact', textFilter: '', summaryFocus: null }), {
+    statusFilter: 'all',
+    kindFilter: 'fact',
+    clearText: false,
+    clearSummaryFocus: false,
+  });
+});
