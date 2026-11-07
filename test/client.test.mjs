@@ -692,3 +692,43 @@ test('点星定位：归档 / 种类 / 文本 / 摘要聚焦该放开的都放�
     clearSummaryFocus: false,
   });
 });
+
+test('高亮：召回命中的星只有光晕不画环，只有选中才画金环', async () => {
+  const client = await loadClient();
+  const { paintPoints } = client.__internals;
+  const point = { id: 'p1', kind: 'fact', rgb: [138, 180, 255], radius: 2, phase: 0, createdAt: 0 };
+  const project = () => ({ x: 100, y: 100, f: 0.9, depth: 1000, ghost: false, point });
+
+  // 只是本轮召回命中：必须有光晕、但不能有环（否则看起来像"没点就选中了"）
+  const focusOnly = { arc: 0, stroke: 0, drawImage: 0 };
+  const ctx1 = makeFakeCtx(focusOnly);
+  paintPoints(ctx1, [project()], { dpr: 2, quality: 2, presence: null, focus: new Set(['p1']), selected: null, hovered: null });
+  assert.equal(focusOnly.arc, 0, '召回命中不该画环');
+  assert.ok(focusOnly.drawImage >= 2, '召回命中要有光晕 + 星点');
+
+  // 选中：画一个环，而且是金色（与列表行的金色强调一致）
+  const selectedOnly = { arc: 0, stroke: 0, drawImage: 0 };
+  const strokes = [];
+  const ctx2 = makeFakeCtx(selectedOnly);
+  const originalStroke = ctx2.stroke;
+  ctx2.stroke = function stroke() {
+    strokes.push(ctx2.strokeStyle);
+    return originalStroke.apply(this, arguments);
+  };
+  paintPoints(ctx2, [project()], { dpr: 2, quality: 2, presence: null, focus: null, selected: 'p1', hovered: null });
+  assert.equal(selectedOnly.arc, 1, '选中要画环');
+  assert.ok(String(strokes[0]).includes('233,192,122'), `选中环应是金色，实际 ${strokes[0]}`);
+
+  // 悬停：也要环，但不是金色
+  const hoveredOnly = { arc: 0, stroke: 0, drawImage: 0 };
+  const hoverStrokes = [];
+  const ctx3 = makeFakeCtx(hoveredOnly);
+  const originalStroke3 = ctx3.stroke;
+  ctx3.stroke = function stroke() {
+    hoverStrokes.push(ctx3.strokeStyle);
+    return originalStroke3.apply(this, arguments);
+  };
+  paintPoints(ctx3, [project()], { dpr: 2, quality: 2, presence: null, focus: null, selected: null, hovered: 'p1' });
+  assert.equal(hoveredOnly.arc, 1);
+  assert.ok(!String(hoverStrokes[0]).includes('233,192,122'), '悬停环不该用金色，免得和选中混淆');
+});
