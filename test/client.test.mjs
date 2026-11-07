@@ -850,6 +850,42 @@ test('深空底：满分辨率烘焙、铺大量星尘，且用完把合成模�
   assert.equal(ctx.globalCompositeOperation, 'source-over', '画完要把加性合成还原');
 });
 
+test('呼吸光：逐星不同相位/周期，振幅有界，关掉就不动', async () => {
+  const client = await loadClient();
+  const { breathOf, layoutSea, projectAll, paintPoints, CAM_DEFAULT } = client.__internals;
+
+  // 有界：任何时刻都在 1±amplitude 之内
+  for (let step = 0; step < 40; step += 1) {
+    const value = breathOf(step * 137, 1.23, 0.1);
+    assert.ok(value >= 0.9 - 1e-9 && value <= 1.1 + 1e-9, `呼吸系数越界：${value}`);
+  }
+  assert.equal(breathOf(1234, 0.5, 0), 1, '振幅为 0 时必须不呼吸');
+  // 不同相位的星在同一时刻不该同步（否则整屏一起闪）
+  const a = breathOf(1500, 0.2, 0.1);
+  const b = breathOf(1500, 2.6, 0.1);
+  assert.ok(Math.abs(a - b) > 0.01, '不同相位应给出不同亮度');
+
+  // 主画布上柔光层确实在随时间变化
+  const { points } = layoutSea(makeMemories(30));
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const alphasAt = (time) => {
+    const seen = [];
+    const ctx = makeFakeCtx({});
+    const original = ctx.drawImage;
+    ctx.drawImage = function capture(...args) {
+      seen.push(ctx.globalAlpha);
+      return original.apply(this, args);
+    };
+    paintPoints(ctx, projected, { quality: 2, halo: true, dpr: 1, time });
+    return seen;
+  };
+  const first = alphasAt(0);
+  const later = alphasAt(1800);
+  assert.equal(first.length, later.length);
+  const changed = first.filter((value, index) => Math.abs(value - later[index]) > 1e-6).length;
+  assert.ok(changed > 10, `柔光透明度应随时间变化，实测只有 ${changed} 个点变了`);
+});
+
 test('焦点模式：没命中的云与标签也要一起压暗', async () => {
   const client = await loadClient();
   const { clusterCloudPlan, paintLabels, pickLabelCandidates, projectAll, layoutSea, CAM_DEFAULT } = client.__internals;
