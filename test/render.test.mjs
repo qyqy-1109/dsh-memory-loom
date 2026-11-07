@@ -322,9 +322,9 @@ test('页面：记忆海铺满内容区，页头/侧栏/页脚与星图都在', 
   assert.deepEqual(texts.filter(Boolean), [], '页面上不应再有返回按钮');
 });
 
-test('星图：时间轴（回放滑杆）必须在，不能被布局挤掉', async () => {
+test('历史回顾页签：滑杆与那一刻的记忆列表都在（时间轴已从画面底部搬走）', async () => {
   installDom();
-  // 星图的主循环用 rAF 自驱动；默认桩会同步回调 → 递归爆栈，这里改成只登记不执行
+  // 星图主循环用 rAF 自驱动；默认桩会同步回调 → 递归爆栈，这里改成只登记不执行
   globalThis.requestAnimationFrame = () => 1;
   globalThis.cancelAnimationFrame = () => {};
   const { loaded, hooks } = await loadPlugin();
@@ -332,33 +332,35 @@ test('星图：时间轴（回放滑杆）必须在，不能被布局挤掉', as
   const { tree } = renderRoot(page, hooks);
   const sea = findAll(tree, isMemorySea)[0];
   assert.notEqual(sea, undefined, '页面里应有星图组件');
+
+  // ① 画面底部不再有时间轴：那条在宿主 main 槽里反复被挤掉，已整体搬进侧栏页签
   const memories = [
     { id: 'm1', kind: 'fact', text: '第一条', createdAt: 1000, status: 'active', hits: 0, supersedes: [] },
     { id: 'm2', kind: 'fact', text: '第二条', createdAt: 2000, status: 'active', hits: 0, supersedes: [] },
   ];
   const { tree: seaTree, errors } = renderRoot(
-    () =>
-      sea.type({
-        memories,
-        dataKey: 'k',
-        selectedId: null,
-        onSelect: () => {},
-        stressToken: 0,
-        onStressReport: () => {},
-        animate: true,
-        scrubAt: null,
-        onScrub: () => {},
-        focusIds: new Set(),
-      }),
+    () => sea.type({ memories, dataKey: 'k', selectedId: null, onSelect: () => {}, stressToken: 0, onStressReport: () => {}, animate: true, scrubAt: null, onScrub: () => {}, focusIds: new Set() }),
     hooks,
   );
   assert.deepEqual(errors.map((failure) => failure.message), [], '星图渲染与 effect 都不能抛错');
-  const byClass = (name) => findAll(seaTree, (node) => String(node.props?.className ?? '').split(' ').includes(name));
-  // 上一版这条被 flex 压缩到 0 高度，整条时间轴凭空消失 —— 现在有测试盯着
-  assert.equal(byClass('ml-scrub').length, 1, '时间轴不能消失');
-  const ranges = findAll(seaTree, (node) => node.type === 'input' && node.props?.type === 'range');
-  assert.ok(ranges.length >= 1, '时间轴的滑杆必须存在');
-  assert.equal(ranges[0].props.max > ranges[0].props.min, true, '回放区间必须有跨度');
+  const inStage = (node, name) => findAll(node, (item) => String(item.props?.className ?? '').split(' ').includes(name));
+  assert.equal(inStage(seaTree, 'ml-scrub').length, 0, '舞台底部不该再挂着时间轴');
+
+  // ② 侧栏「历史回顾」页签里必须有滑杆，并且能列出"那一刻已有的记忆"
+  const pane = loaded.__internals.HistoryPane;
+  assert.equal(typeof pane, 'function', '必须导出 HistoryPane 以便离线验证');
+  const { tree: paneTree } = renderRoot(
+    () => pane({ memories, scrubAt: 1500, onScrub: () => {}, onPick: () => {} }),
+    hooks,
+  );
+  const ranges = findAll(paneTree, (node) => node.type === 'input' && node.props?.type === 'range');
+  assert.equal(ranges.length, 1, '历史回顾里必须有回放滑杆');
+  assert.ok(ranges[0].props.max > ranges[0].props.min, '回放区间必须有跨度');
+  const rows = inStage(paneTree, 'ml-row');
+  assert.equal(rows.length, 1, '停在 1500 时应只列出那一刻已有的 1 条');
+  const nowButton = findAll(paneTree, (node) => node.type === 'button' && String(node.props?.children ?? '') === '回到现在')[0];
+  assert.notEqual(nowButton, undefined, '有偏移时必须能一键回到现在');
+  assert.equal(nowButton.props.disabled, false);
 });
 
 test('侧栏入口：是宿主导航栏里的一项，图标随尺寸与选中态变化', async () => {
