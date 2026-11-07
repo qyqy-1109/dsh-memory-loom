@@ -1100,3 +1100,60 @@ test('云层跟着簇内星一起呼吸（不再有自己的相位）', async ()
   assert.ok(up.alpha > down.alpha, `脉冲为正时云应更亮，实测 ${up.alpha} vs ${down.alpha}`);
   assert.ok(up.size > down.size, '云的尺寸也要跟着呼吸胀缩');
 });
+
+test('共激活线：只连图上的点，强度归一化到 0–1，端点缺失的边直接跳过', async () => {
+  const client = await loadClient();
+  const { layoutSea, buildRecallEdges } = client.__internals;
+  const { points } = layoutSea(makeMemories(20));
+  const list = [
+    { a: points[0].id, b: points[1].id, strength: 8 },
+    { a: points[0].id, b: points[2].id, strength: 2 },
+    // 端点是已删除的记忆：画不出来，不能画一条连到虚空里的线
+    { a: points[0].id, b: 'gone-forever', strength: 5 },
+  ];
+  const edges = buildRecallEdges(points, list);
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].kind, 'recall');
+  assert.equal(edges[0].score, 1, '最强的那条归一化成 1');
+  assert.equal(edges[1].score, 0.25, '其余按比例缩放');
+  // 和相似度线一样，控制点在世界坐标里，转相机时弯跟着转
+  for (const edge of edges) {
+    for (const key of ['x', 'y', 'z']) assert.ok(Number.isFinite(edge.control[key]));
+  }
+});
+
+test('共激活线：关系变多变强时按 maxEdges 截断，不给帧率添负担', async () => {
+  const client = await loadClient();
+  const { layoutSea, buildRecallEdges } = client.__internals;
+  const { points } = layoutSea(makeMemories(40));
+  const list = [];
+  for (let index = 1; index < points.length; index += 1) {
+    list.push({ a: points[0].id, b: points[index].id, strength: points.length - index });
+  }
+  assert.equal(buildRecallEdges(points, list, { maxEdges: 5 }).length, 5);
+  assert.deepEqual(buildRecallEdges(points, []), []);
+  assert.deepEqual(buildRecallEdges(points, null), []);
+});
+
+test('共激活线：单独一色单独一桶，能整类关掉，且不污染金线与相似度线', async () => {
+  const client = await loadClient();
+  const { layoutSea, buildEdges, buildRecallEdges, projectAll, paintEdges, CAM_DEFAULT } = client.__internals;
+  const { points } = layoutSea(makeMemories(40));
+  const topic = buildEdges(points, { maxNeighbors: 3, minScore: 0.15 });
+  const recall = buildRecallEdges(points, [
+    { a: points[0].id, b: points[1].id, strength: 3 },
+    { a: points[2].id, b: points[3].id, strength: 2 },
+  ]);
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const positions = new Map(projected.map((p) => [p.point.id, p]));
+  const all = [...topic, ...recall];
+
+  const on = paintEdges(makeFakeCtx({ stroke: 0 }), all, positions, { showGold: true, showRecall: true });
+  const off = paintEdges(makeFakeCtx({ stroke: 0 }), all, positions, { showGold: true, showRecall: false });
+
+  assert.equal(on.recallCount, 2, '两条共激活线都该画出来');
+  assert.equal(off.recallCount, 0, '关掉之后一条青线都不画');
+  assert.equal(off.total, on.total - 2, '只跳过青线，其它线一条不少');
+  // 三种关系分别计数：青线不该被算进金线
+  assert.equal(on.goldCount, paintEdges(makeFakeCtx({ stroke: 0 }), topic, positions, {}).goldCount);
+});
