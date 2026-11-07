@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -100,6 +100,63 @@ test('导出/导入：往返后内容一致，且导入先备份、坏文件不�
 
   await rm(dirA, { recursive: true, force: true });
   await rm(dirB, { recursive: true, force: true });
+});
+
+test('写前复查：外部改过库就先并进来，别把别人的写入整份覆盖', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'loom-reload-'));
+  const storePath = join(dir, 'store.json');
+  const a = new MemoryStore({ storePath, compactAt: 0 });
+  await a.open();
+  await a.write({ kind: 'fact', text: 'A 的第一条', source: 't' });
+  await a.write({ kind: 'fact', text: 'A 的第二条', source: 't' });
+  assert.equal(
+    a.state.events.filter((event) => event.kind === 'store.reload').length,
+    0,
+    '自己写的不能当成外部改动（否则每次写都先丢一遍内存状态）',
+  );
+
+  // 模拟另一个实例往同一个库写
+  const b = new MemoryStore({ storePath, compactAt: 0 });
+  await b.open();
+  await b.write({ kind: 'fact', text: 'B 写的一条', source: 't' });
+
+  // a 再写：磁盘变了 → 先并进 B 的内容，再叠加自己这条
+  await a.write({ kind: 'fact', text: 'A 的第三条', source: 't' });
+  const texts = a.active().map((row) => row.text);
+  assert.ok(texts.includes('B 写的一条'), '外部写入必须保留，不能被整份覆盖');
+  assert.ok(texts.includes('A 的第三条'), '本次写入也要在');
+  assert.equal(a.state.events.filter((event) => event.kind === 'store.reload').length, 1, '重载一次且留痕');
+  const onDisk = JSON.parse(await readFile(storePath, 'utf8'));
+  assert.equal(onDisk.memories.length, 4, '落盘的应是合并后的四条');
+
+  // 关掉这个能力就回到老行为：不复查、不重载
+  const c = new MemoryStore({ storePath, compactAt: 0, autoReload: false });
+  await c.open();
+  // 磁盘上已经有 a 写下的那条 reload 事件，所以要比"打开之后新增了几条"
+  const reloadsAtOpen = c.state.events.filter((event) => event.kind === 'store.reload').length;
+  const d = new MemoryStore({ storePath, compactAt: 0 });
+  await d.open();
+  await d.write({ kind: 'fact', text: 'D 的一条', source: 't' });
+  await c.write({ kind: 'fact', text: 'C 的一条', source: 't' });
+  assert.equal(
+    c.state.events.filter((event) => event.kind === 'store.reload').length,
+    reloadsAtOpen,
+    'autoReload:false 时不做写前复查',
+  );
+
+  // 外部文件被写坏：不能抛，也不能把内存里的库当空库覆盖掉，只留痕
+  const before = a.active().length;
+  await writeFile(storePath, '{ 这不是 JSON', 'utf8');
+  await a.write({ kind: 'fact', text: 'A 在坏文件之后写的一条', source: 't' });
+  assert.equal(a.active().length, before + 1, '内存里的库要保住并继续可写');
+  assert.ok(
+    a.state.events.some((event) => event.kind === 'store.reload-failed'),
+    '坏文件要留痕，不能静默',
+  );
+  const repaired = JSON.parse(await readFile(storePath, 'utf8'));
+  assert.ok(repaired.memories.length >= before + 1, '写完之后磁盘上是可解析的库');
+
+  await rm(dir, { recursive: true, force: true });
 });
 
 test('会话消息抽取：只留用户原话（导出/导入这类按钮不参与召回）', () => {
