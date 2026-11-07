@@ -163,6 +163,13 @@ await check('client: 星图点选走 focusFromStar，且点击判定不依赖残
   if (/if \(model\.dragMoved\) \{/.test(source)) throw new Error('还在用 dragMoved 做点击判定：拖动后第一次点击会被吞');
 });
 
+await check('client: 拖拽按增量推进（不在 clamp 上"还债"）', () => {
+  if (!source.includes('stepOrbit(')) throw new Error('拖拽没有走 stepOrbit');
+  if (/model\.dragging\.pitch - dy \* 0\.006/.test(source)) {
+    throw new Error('俯仰还在按"离按下点的总位移"算：冲过上限后回拖会先还债，手感就是卡');
+  }
+});
+
 await check('client: 列表滚下去后有「回到顶端」', () => {
   if (!source.includes('ml-top')) throw new Error('缺少回到顶端按钮的样式/类名');
   if (!source.includes('shouldShowTop(')) throw new Error('按钮显隐应当走 shouldShowTop');

@@ -619,6 +619,45 @@ test('回到顶端：滚过阈值才出现，异常滚动值不炸', async () =>
   assert.equal(shouldShowTop(40, 50), false);
 });
 
+test('拖拽俯仰：按增量推进，冲过上限后往回拖立刻响应（不"还债"）', async () => {
+  const client = await loadClient();
+  const { stepOrbit, CAM_LIMITS } = client.__internals;
+
+  // 左上：横向是无限转，纵向夹在 ±maxPitch
+  const right = stepOrbit({ yaw: 0, pitch: 0 }, 100, 0);
+  assert.equal(right.yaw, 0.6);
+
+  // 一路往上拖：到顶就夹住，并明确告诉调用方"被夹了"
+  let camera = { yaw: 0, pitch: 0 };
+  for (let i = 0; i < 10; i += 1) camera = stepOrbit(camera, 0, -100);
+  assert.equal(camera.pitch, CAM_LIMITS.maxPitch);
+  assert.equal(stepOrbit(camera, 0, -50).clamped, true, '继续往上拖要报 clamped');
+
+  // 关键回归：在顶部往回拖一小步，视图必须立刻动
+  // （旧实现用"离按下点的总位移"算，越界量记在起点里，回拖要先还完债 —— 手感就是卡）
+  const back = stepOrbit(camera, 0, 40);
+  assert.ok(back.pitch < CAM_LIMITS.maxPitch, `回拖应立刻下降，实际 ${back.pitch}`);
+  assert.ok(Math.abs(back.pitch - (CAM_LIMITS.maxPitch - 0.24)) < 1e-9);
+
+  // 没被夹时，分多小步走和一步走到底的落点应当一致（增量推进不能改变手感）
+  const oneStep = stepOrbit({ yaw: 0, pitch: 0 }, 30, -20);
+  let many = { yaw: 0, pitch: 0 };
+  for (let i = 0; i < 10; i += 1) many = stepOrbit(many, 3, -2);
+  assert.ok(Math.abs(oneStep.yaw - many.yaw) < 1e-9);
+  assert.ok(Math.abs(oneStep.pitch - many.pitch) < 1e-9);
+});
+
+test('金线：目标被物理删掉时要标出"已不在库里"，而不是静默只剩一条', async () => {
+  const client = await loadClient();
+  const { supersedeNote } = client.__internals;
+  const ordered = [{ id: 'a' }, { id: 'b' }];
+  assert.equal(supersedeNote({ supersedes: ['a'] }, ordered), '1 条');
+  assert.equal(supersedeNote({ supersedes: ['a', 'b'] }, ordered), '2 条');
+  assert.equal(supersedeNote({ supersedes: ['a', 'gone'] }, ordered), '2 条（1 条已不在库里）');
+  assert.equal(supersedeNote({ supersedes: [] }, ordered), '0 条');
+  assert.equal(supersedeNote({}, ordered), '0 条');
+});
+
 test('点星定位：归档 / 种类 / 文本 / 摘要聚焦该放开的都放开', async () => {
   const client = await loadClient();
   const { revealFiltersFor } = client.__internals;
