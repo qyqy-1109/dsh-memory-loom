@@ -605,6 +605,20 @@ test('点击手势：抖动算点击，拖过头或按太久不算，且不留�
   assert.equal(isClickGesture({ x: 100, y: 100, t: 2000 }, { x: 100, y: 100 }, 2100), true);
 });
 
+test('回到顶端：滚过阈值才出现，异常滚动值不炸', async () => {
+  const client = await loadClient();
+  const { shouldShowTop } = client.__internals;
+  assert.equal(shouldShowTop(0), false, '停在顶端时不该出现');
+  assert.equal(shouldShowTop(120), false, '刚滚一点别急着冒按钮');
+  assert.equal(shouldShowTop(240), true);
+  assert.equal(shouldShowTop(9999), true);
+  assert.equal(shouldShowTop(Number.NaN), false, '滚动值坏掉时别把按钮挂出来');
+  assert.equal(shouldShowTop(undefined), false);
+  // 自定义阈值
+  assert.equal(shouldShowTop(60, 50), true);
+  assert.equal(shouldShowTop(40, 50), false);
+});
+
 test('点星定位：归档 / 种类 / 文本 / 摘要聚焦该放开的都放开', async () => {
   const client = await loadClient();
   const { revealFiltersFor } = client.__internals;

@@ -206,6 +206,7 @@ dsh plugin --profile desktop add dsh-memory-loom
   `explicit`（你亲口说的）一条不碰。
 - **双语界面**（v0.30.6）：`window.navigator.language` 不是 `zh-*` 时，页签 / 按钮 / 页脚 / 种类与状态词
   走英文；字典缺词就原样回落中文（宁可中文，也不要空标签）。记忆正文与注入块不翻译。
+- **回到顶部**（v0.31.0）：列表滚过 200px 后右下角浮出「↑ 回到顶部」，平滑滚回；不占布局、不遮正文。
 
 布局与投影参数直接对齐参考实现（[asdfd3/3d-memory-sea](https://github.com/asdfd3/3d-memory-sea)）：
 焦距 1100、初始距离 1200、俯仰 -0.30、相机距离夹在 380–3200。

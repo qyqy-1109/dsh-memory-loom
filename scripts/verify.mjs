@@ -163,6 +163,12 @@ await check('client: 星图点选走 focusFromStar，且点击判定不依赖残
   if (/if \(model\.dragMoved\) \{/.test(source)) throw new Error('还在用 dragMoved 做点击判定：拖动后第一次点击会被吞');
 });
 
+await check('client: 列表滚下去后有「回到顶端」', () => {
+  if (!source.includes('ml-top')) throw new Error('缺少回到顶端按钮的样式/类名');
+  if (!source.includes('shouldShowTop(')) throw new Error('按钮显隐应当走 shouldShowTop');
+  if (!source.includes("scrollTo({ top: 0")) throw new Error('按钮没有真正滚回顶端');
+});
+
 await check('client: 面板有导出/导入入口（导入要二次确认）', () => {
   if (!source.includes('/memory-loom/api/export')) throw new Error('面板没有导出入口');
   if (!source.includes("postAction('import'")) throw new Error('面板没有导入入口');
