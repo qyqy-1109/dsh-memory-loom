@@ -886,6 +886,30 @@ test('呼吸光：逐星不同相位/周期，振幅有界，关掉就不动', a
   assert.ok(changed > 10, `柔光透明度应随时间变化，实测只有 ${changed} 个点变了`);
 });
 
+test('光效关掉时呼吸也要看得见：落在实心核上，幅度两成半以上', async () => {
+  const client = await loadClient();
+  const { layoutSea, projectAll, paintPoints, CAM_DEFAULT } = client.__internals;
+  const { points } = layoutSea(makeMemories(20));
+  const projected = projectAll(points, { ...CAM_DEFAULT }, 900, 600, 0, false, null);
+  const capture = (time) => {
+    const alphas = [];
+    const ctx = makeFakeCtx({});
+    const original = ctx.drawImage;
+    ctx.drawImage = function record(...args) {
+      alphas.push(ctx.globalAlpha);
+      return original.apply(this, args);
+    };
+    paintPoints(ctx, projected, { quality: 2, halo: false, dpr: 1, time });
+    return alphas;
+  };
+  const samples = [0, 700, 1400, 2100, 2800, 3500].map(capture);
+  const index = 0;
+  const values = samples.map((list) => list[index]);
+  const ratio = Math.max(...values) / Math.min(...values);
+  // 之前核心只做 16%，光效一关就完全看不出呼吸 —— 这条盯的就是它
+  assert.ok(ratio > 1.2, `朴素模式下实心核的呼吸幅度应超过 20%，实测 ${((ratio - 1) * 100).toFixed(1)}%`);
+});
+
 test('呼吸模式：逐星 / 只亮命中 / 整片同步 / 关，四种语义不能串味', async () => {
   const client = await loadClient();
   const { pulseFor, breathAmplitude } = client.__internals;
