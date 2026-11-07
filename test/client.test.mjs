@@ -998,3 +998,34 @@ test('焦点模式：没命中的云与标签也要一起压暗', async () => {
   const faintest = Math.min(...alphas);
   assert.ok(faintest <= brightest * 0.3, `非命中标签应压到约 1/8，实测 ${faintest} vs ${brightest}`);
 });
+
+test('云层跟着簇内星一起呼吸（不再有自己的相位）', async () => {
+  const client = await loadClient();
+  const { clusterCloudPlan, paintClusterClouds } = client.__internals;
+  const mk = (cluster, x, y, depth, id) => ({ x, y, depth, f: 1, ghost: false, point: { id, cluster, rgb: [138, 180, 255], phase: 0 } });
+  const projected = [mk('a', 100, 100, 900, 'a1'), mk('a', 300, 300, 900, 'a2')];
+
+  // 没给 pulseOf 时必须是 0：云不能凭空呼吸
+  assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 2 })[0].pulse, 0);
+  // 成员平均
+  assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 2, pulseOf: () => 1 })[0].pulse, 1);
+  assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 2, pulseOf: () => -1 })[0].pulse, -1);
+  assert.equal(clusterCloudPlan(projected, 900, 600, { quality: 2, pulseOf: (id) => (id === 'a1' ? 1 : 0) })[0].pulse, 0.5);
+
+  // 画出来的透明度必须随脉冲变化，且尺寸也跟着变（否则"星在动、光团不动"会回归）
+  const capture = (pulse) => {
+    const seen = [];
+    const ctx = makeFakeCtx({});
+    const original = ctx.drawImage;
+    ctx.drawImage = function record(...args) {
+      seen.push({ alpha: ctx.globalAlpha, size: args[3] });
+      return original.apply(this, args);
+    };
+    paintClusterClouds(ctx, projected, 900, 600, { quality: 2, pulseOf: () => pulse });
+    return seen[0];
+  };
+  const up = capture(1);
+  const down = capture(-1);
+  assert.ok(up.alpha > down.alpha, `脉冲为正时云应更亮，实测 ${up.alpha} vs ${down.alpha}`);
+  assert.ok(up.size > down.size, '云的尺寸也要跟着呼吸胀缩');
+});
