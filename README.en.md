@@ -14,7 +14,7 @@ Cross-session memory for **DeepSeek Harness (DSH)** — governed writes, per-tur
 | Four layers | `memories` (short facts) · `summaries` (compressed clusters) · `slots` (overwritable state) · `events` (audit trail) |
 | Recall | Every turn's first step injects: constraints → slots → episodes → world top3 → facts top3 (with age/weak flags) → summaries |
 | Forgetting | Weight decay by half-life, soft archive (`reason: capacity/superseded/summarized/bulk-log`), every entry restorable |
-| Panel | A full page in the host's `main` slot plus a sidebar entry: 3D memory map, six-layer health lamps, recall trail, audit log |
+| Panel | Two pages in the host's `main` slot plus sidebar entries: the 3D memory map (six-layer health lamps, recall trail, audit log) and a **Persona** page (core / principles / growth log) |
 
 ## Design choices
 
@@ -24,6 +24,11 @@ Cross-session memory for **DeepSeek Harness (DSH)** — governed writes, per-tur
 - **No model call on the write path.** Summaries are extractive (cluster + pick complementary points); an optional
   background rewrite may use `ctx.llm` afterwards, with timeout and fallback. Writing never waits for a model.
 - **Single JSON store, atomically published** (temp file → fsync → rename), all writes serialized.
+- **Persona is diff-only.** `state.self` = core (your worldview, ≤120 chars, written **only by the human** in
+  the panel) + principles (≤40 chars each, max 9, each carrying a `proven`/`broken` evidence ledger) + an op log
+  that stores operations rather than text snapshots. Every change needs a `reason`; budgets are write gates that
+  reject instead of silently truncating. The model has no entry point for the core — a thing that can rewrite
+  its own worldview judges "should I change this" with the already-changed self.
 
 ## Install
 
@@ -34,7 +39,8 @@ dsh plugin --profile desktop add .
 # restart DSH afterwards (profile bundle + manifest changes are not part of HMR)
 ```
 
-A "Memory Loom" entry appears in the left sidebar next to Plugins.
+A "Memory Loom" entry appears in the left sidebar next to Plugins, with two pages: **Memory map** (what happened)
+and **Persona** (who I am).
 
 ## Configure (profile `cordis.patch.yml`)
 
@@ -56,13 +62,31 @@ A "Memory Loom" entry appears in the left sidebar next to Plugins.
 
 `memory_write` (single or up to 20 entries, each with `supersedes`) · `memory_search` (semantic-ish + `since`/`until`
 timeline) · `memory_forget` (soft archive / hard delete) · `memory_restore` (single entry or undo a whole summary) ·
-`memory_stats`.
+`memory_stats` · `memory_self` (persona: `read` / `add` / `merge` / `retire` / `evidence` / `restore`; the core is read-only).
+
+## Persona and undo-by-oplog
+
+`memory_self` is deliberately not "rewrite the whole self-description" — that made the same three principles
+drift every time they were reworded, and left no way to attribute which line changed. Instead:
+
+- `add` requires `evidence` (no evidence means a wish, not a principle), `retire` requires the principle to have been
+  refuted (`broken`) or explicitly superseded, and `merge` may not grow in length.
+- Every write needs a `reason`; the reason is the growth evidence.
+- The composed text is injected each turn as `【我是谁】`, right after hard constraints, and never counted in `hits`.
+- Old stores migrate automatically by splitting the previous narrative into principles **line by line**, byte for
+  byte — no semantic guessing, no rephrasing.
+
+Each step in the growth log has "back to before this step": the oplog is marked (`undoneAt`), never deleted; the undo
+is itself a logged step with a required reason; the inverse is implemented per operation (`add` → remove, `retire` →
+reinstate, `merge` → drop the merge and revive the originals, `evidence` → decrement, `core` → restore the previous
+text). Anything touching the core is refused from the model side, and the migration step (plus pre-`targets` merge
+entries) is reported as not undoable instead of guessed.
 
 ## Verify
 
 ```sh
-node --test "test/*.test.mjs"   # 93 tests
-node scripts/verify.mjs         # 25 checks against a locally installed DSH runtime
+node --test "test/*.test.mjs"   # 225 tests
+node scripts/verify.mjs         # 36 checks against a locally installed DSH runtime
 ```
 
 `verify.mjs` needs a real DSH install (it validates JSON-Schema support against `@deepseek-ai/dsh-tools`).
