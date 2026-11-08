@@ -206,6 +206,13 @@ await check('client: 叙事编辑器必须带理由输入（不许绕过"理由�
   if (!source.includes("action: 'restore'")) throw new Error('缺少回滚入口');
 });
 
+await check('client: 迁移读数在面板里，且写明它的边界', () => {
+  if (!source.includes('transfer.tracked')) throw new Error('面板没显示迁移读数');
+  if (!source.includes('不说明它在那件事上改变了判断')) {
+    throw new Error('迁移的边界说明被删了：「想起」不等于「改变了判断」，不写这句就会被当结论读');
+  }
+});
+
 await check('client: bundle 以 window.__ModuleLoader__.load 包装', () => {
   if (!source.includes('__ModuleLoader__.load')) throw new Error('bundle is not wrapped for the module loader');
 });
