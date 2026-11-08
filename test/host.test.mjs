@@ -510,6 +510,37 @@ test('模型归纳失败：摘要保持抽取式，错误只留痕不抛给写�
   await rm(dir, { recursive: true, force: true });
 });
 
+test('观测：一份注入没人用、满 3 轮结案，并留下「未命中」的痕迹', async () => {
+  const env = await bootstrap();
+  try {
+    const preStep = env.listeners.find((entry) => entry.event === 'agent/pre-step').handler;
+    const write = env.tools.find((tool) => tool.name === 'memory_write');
+    await write.execute({ kind: 'fact', text: '用户喜欢喝手冲咖啡，不加糖' }, {});
+
+    const turn = (text) => async () => ({
+      kind: 'enter',
+      messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+    });
+    const session = { id: 's-miss' };
+    const step = (turnNo) => ({ agent: { session }, step: 1, turn: turnNo, signal: { aborted: false } });
+
+    await preStep(step(1), turn('咖啡 手冲 不加糖 哪个更好'));
+    for (const no of [2, 3, 4]) await preStep(step(no), turn(`今天天气怎么样 ${no}`));
+
+    const state = JSON.parse(await readFile(join(env.dir, 'memory-loom', 'store.json'), 'utf8'));
+    // 没有这条，我们只知道"用上了几次"，不知道"一共有几次机会"—— 命中率算不出来
+    const usages = state.events.filter((event) => event.kind === 'memory.usage');
+    assert.ok(usages.length >= 1, '结案时必须留痕');
+    const settled = usages.at(-1).payload;
+    assert.equal(settled.hit, 0, '没人用');
+    assert.ok(settled.offered >= 1, '要记下当时给了几条');
+    assert.equal(settled.turns, 3, '满 3 轮结案');
+    assert.equal(state.memories[0].usedCount ?? 0, 0);
+  } finally {
+    await env.cleanup();
+  }
+});
+
 test('使用信号：下一轮说到同一条记忆的指纹词，才算「用上了」', async () => {
   const env = await bootstrap();
   try {
