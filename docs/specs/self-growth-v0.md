@@ -279,6 +279,11 @@ choice: null | { a: string, b: string, picked: 'a' | 'b' }
 
 ## 11. 实现状态（0.51.0）
 
+> 视觉：人格页与记忆海是**太极的两半**。记忆海为阴（深/冷/远/虚/多），
+> 人格页为阳（亮/暖/近/实/一）—— 内核是这一页唯一的"太阳"，其余三块是它的注脚。
+> 具体到结构：主体 `data-main`（暖底 + 朱色粗线 + 23px 大字），注脚 `data-aside`（缩进 + 降档 + 淡色）。
+> 这一页禁用 `.ml-btn` / `.ml-input`（深色卡片的写法，浅底上会变成黑块），有测试守着。
+
 已落地：
 
 - `state.self`（core / principles / oplog / versions）+ 幂等迁移；`state.selfNarrative`
