@@ -194,6 +194,18 @@ await check('client: 面板有导出/导入入口（导入要二次确认）', (
   if (!source.includes('pendingImport')) throw new Error('导入缺少「选完文件再确认」的中间态');
 });
 
+await check('client: 成长页签在，且读数走宿主的同一份函数', () => {
+  if (!source.includes("['growth'")) throw new Error('面板没有成长页签');
+  if (!source.includes('/memory-loom/api/growth')) throw new Error('面板没有去拉成长读数');
+  if (!source.includes('function GrowthPane')) throw new Error('缺少成长页签的组件');
+});
+
+await check('client: 叙事编辑器必须带理由输入（不许绕过"理由必填"）', () => {
+  if (!source.includes("postAction('narrative'")) throw new Error('面板没有走叙事的 API');
+  if (!source.includes('为什么这次要改')) throw new Error('缺少理由输入框：历史就成了没有注释的文本');
+  if (!source.includes("action: 'restore'")) throw new Error('缺少回滚入口');
+});
+
 await check('client: bundle 以 window.__ModuleLoader__.load 包装', () => {
   if (!source.includes('__ModuleLoader__.load')) throw new Error('bundle is not wrapped for the module loader');
 });

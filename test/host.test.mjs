@@ -230,6 +230,73 @@ test('HTTP：GET /memory-loom/api/state 返回快照与六层健康，且 no-sto
   }
 });
 
+test('HTTP：GET /api/growth 与 POST /api/narrative 走的是同一份库和同一套校验', async () => {
+  const env = await bootstrap();
+  try {
+    const [route] = env.routes;
+
+    // ① 成长读数是只读的：算一遍不能把库写脏
+    const growth = makeRes();
+    await route.handler(makeReq('GET', '/memory-loom/api/growth'), growth);
+    assert.equal(growth.statusCode, 200);
+    const report = JSON.parse(growth.body);
+    assert.ok(typeof report.headline === 'string' && report.headline.length > 0);
+    assert.equal(report.contract.chars, 0, '空库没有常量开销');
+    assert.equal(report.narrative.has, false, '还没有叙事时如实说没有');
+    assert.ok(Array.isArray(report.notes) && report.notes.length > 0);
+
+    // ② 没写理由的重写要被挡下来，并且原因是给人看的
+    const refused = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我是谁' }), refused);
+    assert.equal(refused.statusCode, 200, '校验失败是"填错了"，不是服务端故障');
+    const refusedBody = JSON.parse(refused.body);
+    assert.equal(refusedBody.ok, false);
+    assert.ok(refusedBody.error.includes('理由'));
+
+    // ③ 正常重写：面板走 API 和工具走的是同一条 store 路径
+    const first = makeRes();
+    await route.handler(
+      makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我先量再下结论。', reason: '第一版' }),
+      first,
+    );
+    const firstBody = JSON.parse(first.body);
+    assert.equal(firstBody.ok, true);
+    assert.equal(firstBody.chars, [...'我先量再下结论。'].length);
+    assert.equal(firstBody.versions, 0);
+
+    const second = makeRes();
+    await route.handler(
+      makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我先量，量完敢换口径。', reason: '第二版' }),
+      second,
+    );
+    assert.equal(JSON.parse(second.body).versions, 1, '旧版必须进历史');
+
+    // ④ 回滚：换成旧版，当前版进历史
+    const read = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'read' }), read);
+    const readBody = JSON.parse(read.body);
+    assert.equal(readBody.current.text, '我先量，量完敢换口径。');
+    const target = readBody.history[0];
+
+    const restore = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'restore', id: target.id }), restore);
+    assert.equal(JSON.parse(restore.body).ok, true);
+
+    const after = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'read' }), after);
+    const afterBody = JSON.parse(after.body);
+    assert.equal(afterBody.current.text, '我先量再下结论。', '回滚后当前版是旧版');
+    assert.ok(afterBody.history.some((row) => row.text === '我先量，量完敢换口径。'), '被替换下来的那版还在');
+
+    // ⑤ 回滚到不存在的版本要明确失败
+    const missing = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'restore', id: 'nope' }), missing);
+    assert.equal(JSON.parse(missing.body).ok, false);
+  } finally {
+    await env.cleanup();
+  }
+});
+
 test('HTTP：POST 搜索与未知路由的失败语义', async () => {
   const env = await bootstrap();
   try {
