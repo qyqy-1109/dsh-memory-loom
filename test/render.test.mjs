@@ -420,15 +420,27 @@ test('人格页：太极为阳 —— 亮/暖/近/实/一，且不许借用深�
   }
   // 阳这套样式必须真的存在
   assert.ok(source.includes('.ml-page.ml-yang{'), '缺少阳的页面样式');
-  assert.ok(source.includes('rgba(139,104,87,.12)'), '日晕不见了：阳的"明"要有一个来向');
-  // 「更灰」= 降饱和，不是滑向中性灰 —— 全灰就掉回阴那一侧了。
-  // 所以这里守的是一条**带**：灰而有温度。两边出界都算错。
-  const zhu = /--zhu:#([0-9a-f]{6})/.exec(source);
-  assert.notEqual(zhu, null, '主色不见了：阳要暖，不能是冷灰');
-  const rgb = [0, 2, 4].map((offset) => parseInt(zhu[1].slice(offset, offset + 2), 16));
-  const sat = (Math.max(...rgb) - Math.min(...rgb)) / Math.max(...rgb);
-  assert.ok(sat <= 0.42, `主色饱和度 ${sat.toFixed(2)} 太高：那是烫，不是灰`);
-  assert.ok(sat >= 0.25, `主色饱和度 ${sat.toFixed(2)} 太低：太灰就掉回阴那一侧`);
+  assert.ok(/radial-gradient\(122% 84% at 18% -14%/.test(source), '日晕不见了：阳的"明"要有一个来向');
+  // 「灰」与「生机」是两条**不同的**轴，不能用一个旋钮调：
+  //   · 彩度：太烫是在喊，太灰是死 —— 只许落在中间那一带；
+  //   · 明暗：底色要亮、墨要黑、主块要亮得像被光打到 —— 对比才是活气。
+  //   （0.51.4 就是只压了彩度、没补对比，画面才发死。）
+  const hexOf = (name) => {
+    const found = new RegExp(`--${name}:#([0-9a-f]{6})`).exec(source);
+    assert.notEqual(found, null, `缺少 --${name}`);
+    return [0, 2, 4].map((offset) => parseInt(found[1].slice(offset, offset + 2), 16));
+  };
+  const satOf = (rgb) => (Math.max(...rgb) - Math.min(...rgb)) / Math.max(...rgb);
+  const lumOf = (rgb) => (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+  const zhu = hexOf('zhu');
+  const sun = hexOf('sun');
+  const bg = hexOf('yang-1');
+  const ink = hexOf('ink');
+  const sat = satOf(zhu);
+  assert.ok(sat >= 0.4 && sat <= 0.62, `主色彩度 ${sat.toFixed(2)} 出界：<0.4 会灰死，>0.62 会发烫`);
+  assert.ok(lumOf(bg) - lumOf(zhu) >= 0.45, '底色与主色明度差太小：没有对比就没有光，画面会发死');
+  assert.ok(lumOf(ink) <= 0.18, '墨不够黑：对比全靠它撑，字一灰整页就塌');
+  assert.ok(lumOf(sun) - lumOf(zhu) >= 0.15, '金砂与赭红要拉开明度：单色自己加深只会更闷');
   assert.ok(source.includes('.ml-yang .ml-core-text'), '内核要有一档自己的大字');
   // 五组对立里最关键的一组：一 vs 多 —— 主体与注脚必须在结构上分得开
   assert.ok(body.includes("'data-main': 'true'"), '内核必须是这一页唯一的主体');
