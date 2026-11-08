@@ -111,8 +111,8 @@ await check('host: 没有 default 导出（否则 loader 会丢掉 inject 声明
   if (typeof host.apply !== 'function') throw new Error('missing apply export');
 });
 
-await check('host: 注册了 5 个工具', () => {
-  if (captured.tools.length !== 5) throw new Error(`expected 5 tools, got ${captured.tools.length}`);
+await check('host: 注册了 6 个工具', () => {
+  if (captured.tools.length !== 6) throw new Error(`expected 6 tools, got ${captured.tools.length}`);
 });
 
 for (const tool of captured.tools) {

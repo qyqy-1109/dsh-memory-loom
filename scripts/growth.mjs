@@ -69,7 +69,7 @@ function render(report, storePath) {
   lines.push(`一句话：${report.headline}`);
   lines.push('');
 
-  const { contract, groups, growth, used, revise, notes } = report;
+  const { contract, groups, growth, used, revise, narrative, notes } = report;
   lines.push(`契约块（每轮固定注入）：${contract.chars} 字 / ${contract.total} 条`);
   for (const block of contract.blocks) {
     lines.push(`  ${block.title} ${block.count} 条  ${block.chars} 字`);
@@ -112,6 +112,12 @@ function render(report, storePath) {
   lines.push(`  趋势：${growth.direction === 'up' ? '变密' : growth.direction === 'down' ? '变胖' : '持平'}`);
   lines.push('');
 
+  lines.push(
+    narrative.has
+      ? `自我叙事：${narrative.chars} 字｜历史 ${narrative.versions} 版` +
+          `${narrative.drift === null ? '' : `｜与最早版差异 ${pct(narrative.drift)}`}`
+      : '自我叙事：还没有（`self` 只是碎片，成长缺的正是这一块）',
+  );
   lines.push(
     `改写信号：被改写 ${revise.revisedRows}/${revise.rows} 条（${pct(revise.rate)}，共 ${revise.touched} 次）` +
       `${revise.heaviestKind === null ? '' : `｜最多在 ${revise.heaviestKind}（${revise.byKind[revise.heaviestKind]} 条）`}` +
