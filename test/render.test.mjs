@@ -420,8 +420,11 @@ test('人格页：太极为阳 —— 亮/暖/近/实/一，且不许借用深�
   }
   // 阳这套样式必须真的存在
   assert.ok(source.includes('.ml-page.ml-yang{'), '缺少阳的页面样式');
-  assert.ok(/--zhu:#b8492a/.test(source), '朱色不见了：阳要暖，不能是冷灰');
-  assert.ok(source.includes('rgba(224,138,74,.24)'), '日晕不见了：阳的"明"要有一个来向');
+  assert.ok(/--zhu:#a15a3c/.test(source), '朱色不见了：阳要暖，不能是冷灰');
+  assert.ok(source.includes('rgba(207,146,100,.15)'), '日晕不见了：阳的"明"要有一个来向');
+  // 降过一档（0.51.3）：热度不许被悄悄加回去 —— 阳是"暖得近"，不是"烧得响"
+  assert.equal(/rgba\(224,138,74,\.2[0-9]\)/.test(source), false, '旧的烫日子日晕又回来了');
+  assert.equal(/#b8492a/.test(source), false, '旧的烫朱又回来了');
   assert.ok(source.includes('.ml-yang .ml-core-text'), '内核要有一档自己的大字');
   // 五组对立里最关键的一组：一 vs 多 —— 主体与注脚必须在结构上分得开
   assert.ok(body.includes("'data-main': 'true'"), '内核必须是这一页唯一的主体');
