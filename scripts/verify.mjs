@@ -15,7 +15,7 @@
  *   DSH_NODE_MODULES=<DSH 安装目录>/resources/dsh/node_modules
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -111,8 +111,8 @@ await check('host: 没有 default 导出（否则 loader 会丢掉 inject 声明
   if (typeof host.apply !== 'function') throw new Error('missing apply export');
 });
 
-await check('host: 注册了 6 个工具', () => {
-  if (captured.tools.length !== 6) throw new Error(`expected 6 tools, got ${captured.tools.length}`);
+await check('host: 注册了 7 个工具', () => {
+  if (captured.tools.length !== 7) throw new Error(`expected 7 tools, got ${captured.tools.length}`);
 });
 
 for (const tool of captured.tools) {
@@ -211,6 +211,25 @@ await check('client: 成长记录里有按流水回退的入口（且回退理�
   if (!source.includes('回到这一步之前')) throw new Error('缺少回退按钮');
   if (!source.includes('回退理由（必填）')) throw new Error('回退也要写理由：不然历史又变成没有注释的文本');
   if (!source.includes("action: 'restore'")) throw new Error('面板没有调回退的 API');
+});
+
+await check('host: 私人记录与记忆库在结构上不相通', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (/private\.js/.test(storeSource)) {
+    throw new Error('store.js 引用了 private.js：私人记录会漏进检索与注入，那块地方就废了');
+  }
+  if (!hostSource.includes("name: 'memory_private'")) throw new Error('缺少 private 记录的写入口');
+  if (!existsSync(join(process.cwd(), 'lib', 'private.js'))) throw new Error('缺少 private.js');
+});
+
+await check('host: 取舍账本 kind=choice 三键齐且不注入', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!storeSource.includes("choice: '取舍'")) throw new Error('store 里没有 choice 这个 kind');
+  if (!hostSource.includes('choicePicked')) throw new Error('工具 schema 缺 choicePicked：只写选了什么，读不出偏好');
+  if (!storeSource.includes('skipDedupe')) throw new Error('取舍不许查重：去重会把频次吃掉');
+  if (!source.includes("'choice'")) throw new Error('面板的 kind 表里没有 choice');
 });
 
 await check('client: 迁移读数在面板里，且写明它的边界', () => {

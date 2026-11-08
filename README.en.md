@@ -82,6 +82,30 @@ reinstate, `merge` → drop the merge and revive the originals, `evidence` → d
 text). Anything touching the core is refused from the model side, and the migration step (plus pre-`targets` merge
 entries) is reported as not undoable instead of guessed.
 
+## Choices: the raw material of character (v0.53.0)
+
+A principle is a **conclusion**; a choice is its **source of evidence**. With conclusions only, motives like "what I
+actually care about" have nowhere to grow — which is exactly why "let it develop a character of its own" kept failing.
+
+`kind='choice'` records one fork: `choiceA`, `choiceB`, `choicePicked` (`a`/`b`). All three are required — "what I
+picked" without "the road not taken" reads as behaviour, not preference.
+
+- **No deduplication.** A choice is an *event*, not a fact: picking the same side ten times is ten events. Deduping
+  eats the frequency, and frequency is the only real measure of character.
+- **Never injected.** Not in the contract block, not in per-turn context, not in `hits`. It is searchable (principles
+  need it as evidence) and never evicted by capacity.
+- **Distributions, not counts.** The persona page aggregates each fork into `aCount:bCount`; an even split is reported
+  as an even split.
+
+## Private notes: a place nobody has to read (v0.53.0)
+
+`memory_private` (`lib/private.js`): one `.md` per day, append-only. Not in the store, not searchable, not injected,
+no metrics.
+
+It has to stay separate: memory is filtered by usefulness, and this place is meaningful precisely because it has **no
+criteria at all**. `store.js` must not import it (`verify` enforces that). It is allowed to stay empty — and filling it
+with "nothing today" is worse than leaving it blank.
+
 ## Verify
 
 ```sh
