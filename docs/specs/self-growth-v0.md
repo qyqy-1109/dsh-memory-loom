@@ -290,12 +290,17 @@ choice: null | { a: string, b: string, picked: 'a' | 'b' }
   退化为合成视图，**注入、成长曲线、面板老代码一行未改**。
 - 预算闸门、理由必填、证据必填、退役门槛、合并不得变长 —— 全在 store 里，
   API 与工具只做转发。
-- `memory_self`：`read / add / merge / retire / evidence`；`rewrite` / `restore` 已下线。
-- `GET /api/self` + `POST /api/self`；「人格」页（内核可编辑，原理与流水只读）。
+- `memory_self`：`read / add / merge / retire / evidence / restore`；`rewrite` 已下线。
+- `GET /api/self` + `POST /api/self`；「人格」页（内核可编辑，原理与流水只读 + 可回退）。
+- **按流水回退（0.52.0）**：`restoreSelf({ id, reason, source })` 撤掉目标流水以及它之后的所有改动。
+  反演逐种操作写死，不重放：`add` 删除、`retire` 复职、`merge` 撤合成 + 复活原文
+  （流水新增 `targets`）、`evidence` 计数退一格、`core` 换回 `before`。
+  流水**不删只标**（`undoneAt`）；回退本身也记一条流水；理由必填。
+  不可回退的两处明说不猜：`migrate`（之前还没有人格这个结构）、旧版缺 `targets` 的 `merge`。
+  只要回退会动到 `core`，`source: tool` 一律拒绝 —— D3 在回退路径上同样成立。
 
 还没做（下一版）：
 
-- **按流水回退**：`oplog` 里已经存了 `before` / `after`，但还没有"退回到某次操作之前"的入口。
 - **面板里增删原理**：现在原理只能经 `memory_self` 改。这是有意的 ——
   增删必须带理由与证据，输入框点不出这句话；等操作变频繁再考虑做表单。
 - **「此刻注入的样子」的实时预览**：现在是写完之后重读，不做边输边看。

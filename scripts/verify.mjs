@@ -207,6 +207,12 @@ await check('client: 人格页的内核编辑器必须带理由输入（不许�
   if (!source.includes('「人格」页')) throw new Error('成长页签要指向人格页，否则人找不到编辑口');
 });
 
+await check('client: 成长记录里有按流水回退的入口（且回退理由必填）', () => {
+  if (!source.includes('回到这一步之前')) throw new Error('缺少回退按钮');
+  if (!source.includes('回退理由（必填）')) throw new Error('回退也要写理由：不然历史又变成没有注释的文本');
+  if (!source.includes("action: 'restore'")) throw new Error('面板没有调回退的 API');
+});
+
 await check('client: 迁移读数在面板里，且写明它的边界', () => {
   if (!source.includes('transfer.tracked')) throw new Error('面板没显示迁移读数');
   if (!source.includes('不说明它在那件事上改变了判断')) {

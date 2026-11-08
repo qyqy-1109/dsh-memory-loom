@@ -425,6 +425,122 @@ test('硬约束：人格可以影响"写"，不能影响"读"', async () => {
   }
 });
 
+test('回退：撤掉一步之后，原理真的回到那一步之前', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    const { id: memoryId } = await store.write({ kind: 'fact', text: '一条证据' });
+    const { id } = await store.addPrinciple({ text: '先量再改', reason: '一', evidence: [memoryId] });
+    assert.equal(store.livePrinciples().length, 1);
+    const addEntry = store.selfOplog(50).find((row) => row.op === 'add');
+    const result = await store.restoreSelf({ id: addEntry.id, reason: '这条不是原理', source: 'panel' });
+    assert.equal(result.steps, 1);
+    assert.equal(store.livePrinciples().length, 0, '加的那条被撤掉了');
+    assert.equal(store.selfNarrative(), null, '合成视图也要跟着空');
+    // 流水不删，只标记；回退本身也留一条
+    const ops = store.selfOplog(50);
+    assert.equal(ops.filter((row) => row.op === 'restore').length, 1, '回退自己是一条流水');
+    assert.equal(ops.find((row) => row.id === addEntry.id).undoneAt === null, false, '被撤的那条打了标记');
+    void id;
+  } finally {
+    await close(dir);
+  }
+});
+
+test('回退：超出一条（连它之后的都撤），且撤过的不许再撤', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    const { id: memoryId } = await store.write({ kind: 'fact', text: '一条证据' });
+    const first = await store.addPrinciple({ text: '第一条', reason: '一', evidence: [memoryId] });
+    const firstEntry = store.selfOplog(50).find((row) => row.op === 'add' && row.target === first.id);
+    await store.addPrinciple({ text: '第二条', reason: '二', evidence: [memoryId] });
+    await store.addPrinciple({ text: '第三条', reason: '三', evidence: [memoryId] });
+    assert.equal(store.livePrinciples().length, 3);
+    const result = await store.restoreSelf({ id: firstEntry.id, reason: '三条都不对', source: 'panel' });
+    assert.equal(result.steps, 3, '第一步以及它之后的全部撤回');
+    assert.equal(store.livePrinciples().length, 0);
+    await assert.rejects(() => store.restoreSelf({ id: firstEntry.id, reason: '再撤一次', source: 'panel' }), /已经被回退过/);
+  } finally {
+    await close(dir);
+  }
+});
+
+test('回退：内核只有人能撤回（模型侧一律拒）', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    await store.setCore({ text: '第一版内核', reason: '一', source: 'panel' });
+    await store.setCore({ text: '第二版内核', reason: '二', source: 'panel' });
+    // selfOplog(50) 最新在前：第一条是第二次写内核，第二条才是第一次
+    const [latestCore, firstCore] = store.selfOplog(50).filter((row) => row.op === 'core');
+    await assert.rejects(
+      () => store.restoreSelf({ id: latestCore.id, reason: '模型想撤内核', source: 'tool' }),
+      /内核只能由人经面板改/,
+    );
+    assert.equal(store.selfCore().text, '第二版内核', '被拒之后内核一个字都没动');
+    await store.restoreSelf({ id: latestCore.id, reason: '第一版更好', source: 'panel' });
+    assert.equal(store.selfCore().text, '第一版内核', '回到第二次写内核之前');
+    // 再往前一步：跨过上一次回退也要能走通（回退本身没有状态可反演）
+    await store.restoreSelf({ id: firstCore.id, reason: '干脆撤到未定', source: 'panel' });
+    assert.equal(store.selfCore(), null, '回到第一次写内核之前，就该是"未定"');
+  } finally {
+    await close(dir);
+  }
+});
+
+test('回退：退役与证据计数都能反演；合并能复活原文', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    const { id: memoryId } = await store.write({ kind: 'fact', text: '一条证据' });
+    const first = await store.addPrinciple({ text: '先量再改', reason: '一', evidence: [memoryId] });
+    const second = await store.addPrinciple({ text: '量完换口径', reason: '二', evidence: [memoryId] });
+    const merged = await store.mergePrinciples({ ids: [first.id, second.id], text: '先量，量完换口径', reason: '一件事' });
+    const mergeEntry = store.selfOplog(50).find((row) => row.op === 'merge');
+    assert.equal(store.livePrinciples().length, 1);
+    await store.restoreSelf({ id: mergeEntry.id, reason: '还是分开清楚', source: 'panel' });
+    assert.equal(store.livePrinciples().length, 2, '两条原文复活');
+    assert.ok(store.livePrinciples().some((row) => row.id === first.id));
+    assert.ok(store.livePrinciples().some((row) => row.id === second.id));
+    assert.equal(store.selfPrinciples().some((row) => row.id === merged.id), false, '合出来的那条被撤掉');
+
+    // 证据计数也要能撤回
+    await store.recordPrincipleEvidence({ id: first.id, result: 'broken', note: '这次没量', source: 'panel' });
+    assert.equal(store.selfPrinciples().find((row) => row.id === first.id).evidence.broken, 1);
+    const evidenceEntry = store.selfOplog(50).find((row) => row.op === 'evidence');
+    await store.restoreSelf({ id: evidenceEntry.id, reason: '记错了', source: 'panel' });
+    assert.equal(store.selfPrinciples().find((row) => row.id === first.id).evidence.broken, 0, '推翻次数退回去');
+  } finally {
+    await close(dir);
+  }
+});
+
+test('回退：迁移那一步不可回退，没理由也不行', async () => {
+  const { dir, store } = await openLegacyStore();
+  try {
+    const migrateEntry = store.selfOplog(50).find((row) => row.source === 'migrate');
+    assert.notEqual(migrateEntry, undefined);
+    await assert.rejects(
+      () => store.restoreSelf({ id: migrateEntry.id, reason: '想撤掉迁移', source: 'panel' }),
+      /迁移那一步不可回退/,
+    );
+    await assert.rejects(() => store.restoreSelf({ id: 'nope', reason: '找不到', source: 'panel' }), /找不到这条流水/);
+    await assert.rejects(() => store.restoreSelf({ id: migrateEntry.id, reason: '  ', source: 'panel' }), /理由/);
+  } finally {
+    await close(dir);
+  }
+});
+
+test('回退：面板读得到 undone / undoable，迁移那条标成不可回退', async () => {
+  const { dir, store } = await openLegacyStore();
+  try {
+    const view = store.selfView();
+    const migrateRow = view.oplog.find((row) => row.source === 'migrate');
+    assert.equal(migrateRow.undoable, false, '迁移不可回退：它之前还没有人格');
+    assert.equal(migrateRow.undone, false);
+    assert.equal(view.counts.undone, 0);
+  } finally {
+    await close(dir);
+  }
+});
+
 test('落盘：内核、原理、流水都要真的写进文件', async () => {
   const { dir, store } = await openTempStore();
   try {

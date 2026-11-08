@@ -279,6 +279,13 @@ test('HTTP：GET /api/self 与 POST /api/self 走的是同一份库和同一套�
     const unknownBody = JSON.parse(unknown.body);
     assert.equal(unknownBody.ok, true);
     assert.equal(unknownBody.view.composed.chars, [...'我先量再下结论。'].length, '整段重写的入口已经没有了');
+
+    // ⑤ 回退：找不到的流水要明确失败，而不是当成功
+    const missing = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/self', { action: 'restore', id: 'nope', reason: '试试' }), missing);
+    const missingBody = JSON.parse(missing.body);
+    assert.equal(missingBody.ok, false);
+    assert.ok(missingBody.error.includes('找不到'));
   } finally {
     await env.cleanup();
   }
