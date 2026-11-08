@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { MemoryStore } from '../lib/store.js';
-import { contractCost, narrativeSignal } from '../lib/growth.js';
+import { contractCost, growthCurve, narrativeSignal } from '../lib/growth.js';
 
 const V1 = '我倾向于先在真实数据上量一遍再下结论。';
 const V2 = '我先量再下结论，但量完要敢承认某个指标不成立——口径错了就换，别硬撑。';
@@ -237,6 +237,35 @@ test('老库没有 selfNarrative 字段：补空形状，不当成坏数据', as
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test('成长曲线的契约字数要算上叙事（漏算自己人的开销，是最不该犯的错）', () => {
+  const DAY = 86_400_000;
+  const now = 10 * DAY;
+  const memories = [{ id: 'a', kind: 'fact', text: '一条记忆。', status: 'active', createdAt: 1 * DAY, hits: 0 }];
+  const base = growthCurve({ memories, slots: [], selfNarrative: { current: null, versions: [] } }, { now, buckets: 2, bucketDays: 7 });
+  const withNarrative = growthCurve(
+    {
+      memories,
+      slots: [],
+      selfNarrative: {
+        current: { id: 'n1', text: '我是谁：一段自我描述。', at: 8 * DAY, reason: '第一版' },
+        versions: [],
+      },
+    },
+    { now, buckets: 2, bucketDays: 7 },
+  );
+  assert.ok(withNarrative.buckets.at(-1).contractChars > base.buckets.at(-1).contractChars, '最后一桶必须包含叙事的字数');
+  assert.equal(
+    withNarrative.buckets.at(-1).contractChars - base.buckets.at(-1).contractChars,
+    [...'我是谁：一段自我描述。'].length,
+    '差额应当正好是叙事本身的字数',
+  );
+  assert.equal(
+    withNarrative.buckets[0].contractChars,
+    base.buckets[0].contractChars,
+    '叙事写之前的那几桶不该被追溯性地加上去',
+  );
 });
 
 test('叙事读数：版本之间一字未改要判成"誊抄"，不是成长', () => {
