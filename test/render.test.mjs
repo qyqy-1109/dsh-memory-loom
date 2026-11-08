@@ -405,3 +405,21 @@ test('人格页：单开一页（不是浮层），读不到数据时也不抛�
   const backs = findAll(tree, (node) => node.type === 'button' && JSON.stringify(node.props.children).includes('返回'));
   assert.deepEqual(backs, [], '页面上不应有返回按钮');
 });
+
+test('人格页：和记忆海是对立风格 —— 纸面，且不许借用深色卡片的控件', async () => {
+  // 这条守的是用户看到的那个 bug：`.ml-btn` / `.ml-input` 是深色卡片里的写法
+  // （background:#080e1a + 深色文字），放到浅色纸面上就成了"两个黑黑的方块"。
+  const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8');
+  const start = source.indexOf('function PersonaPage');
+  assert.ok(start > 0, '必须有 PersonaPage');
+  const body = source.slice(start, source.indexOf('function MemorySeaPage'));
+  for (const forbidden of ['ml-btn', 'ml-input', '.ml-block', 'ml-self-block', 'ml-persona-body']) {
+    assert.equal(body.includes(forbidden), false, `人格页不许再用 ${forbidden}（深色卡片的写法，浅底上会变成黑块）`);
+  }
+  // 纸面这套样式必须真的存在：底色是暖纸，不是宿主的纯白
+  assert.ok(source.includes('.ml-page.ml-paper{'), '缺少纸面样式');
+  assert.ok(/--paper:#f7f4ee/.test(source), '纸面底色不见了');
+  assert.ok(source.includes('.ml-paper .ml-core-text'), '内核要有一档自己的大字');
+  assert.ok(source.includes('.ml-paper .ml-timeline'), '成长记录是一条线，不是星网');
+  assert.ok(source.includes('ml-page ml-paper'), '页面根要同时带上两个类');
+});

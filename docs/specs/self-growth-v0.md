@@ -165,12 +165,21 @@ state.self = {
 
 ## 4. 迁移
 
-现有 `state.selfNarrative = { current, versions }`，`current.text` 是 127 字的三句话。
+现有 `state.selfNarrative = { current, versions }`，`current.text` 是 127 字。
 
-1. 按行切分 `current.text`，得到 3 条原理，逐条写成 `principles[]`（`born = current.at`，`bornFrom = []`，`evidence` 全零）。
+1. **两级切分**：先按行（作者自己划的段），任何一段超过 40 字再按句（`。！？；`）拆。
+   为什么要有第二级：真实库里那 127 字是**一整行**的，只按行拆会得到一条 130 字的"原理"，
+   而原理该是判断，不是叙述。拆句不猜语义、不改一个字。
 2. `core = null`（内核待用户写；空缺期间不注入）。
-3. `versions[]` 整段转进 `oplog`，`op` 记为 `'restore'`，保留原 `reason`。
-4. **`state.selfNarrative` 不删，改为由 `state.self` 合成的只读视图**：
+3. `versions[]` 先搬进 `self.versions`，同时记一条 `op='restore'`、`source='migrate'` 的流水。
+4. **不改的保证（精确表述）**：合成文本与原叙事**字符一一相同**，只允许换行位置变化
+   （拆句会在句号后加换行）。多行且每段 ≤40 字的老库，一个字都不差。
+   这条用"去掉空白后逐字比较"来验，而不是靠肉眼。
+5. `state.selfNarrative` 不删，改为由 `state.self` 合成的只读视图：
+6. 迁移是幂等的：`state.self` 已存在就直接跳过。
+7. **补拆（0.51.1）**：0.51.0 只按行拆，真实库里留下了一条 130 字的残留原理。
+   补拆只认「迁移来的唯一一条、超过单条上限、且没有任何验/破账」这一种形状，
+   拆完条数必然 > 1，于是不会再次触发 —— 天然幂等，也不碰用户自己写的原理。
 
 ```js
 selfNarrative() -> { id, text: joinCore(principles), at, reason, ... }

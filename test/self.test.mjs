@@ -105,6 +105,87 @@ test('迁移：老叙事按行拆成原理，合回来必须一字不差', async
   }
 });
 
+test('迁移：一整行的长叙事按句拆开，字符一个不少', async () => {
+  // 真实库里那段 127 字就是**一整行**的：只按行拆会得到一条 130 字的"原理"，
+  // 而原理该是判断，不是叙述。所以迁移有两级：先按行，太长再按句。
+  const dir = await mkdtemp(join(tmpdir(), 'loom-self-long-'));
+  const text =
+    '我的成长靠压缩，不靠累积：同样的注入预算里，要多一句原理、少三条场景。定指标先问「这个信号发生的物理条件成不成立」——used 就栽在这里。做取舍先算代价：契约块每轮付钱，装饰不付钱。';
+  await writeFile(
+    join(dir, 'store.json'),
+    JSON.stringify({
+      memories: [],
+      summaries: [],
+      slots: [],
+      edges: [],
+      events: [],
+      selfNarrative: { current: { id: 'legacy-long', text, at: 1_700_000_000_000, reason: '第一版', source: 'tool', chars: [...text].length }, versions: [] },
+    }),
+    'utf8',
+  );
+  const store = new MemoryStore({ storePath: join(dir, 'store.json'), compactAt: 0 });
+  try {
+    await store.open();
+    const principles = store.livePrinciples();
+    assert.ok(principles.length >= 3, `按句拆成几条（现在是 ${principles.length}）`);
+    const squeeze = (value) => String(value).replace(/\s+/g, '');
+    assert.equal(squeeze(store.selfNarrative().text), squeeze(text), '拆开只许动换行，一个字都不能少');
+    assert.deepEqual(principles.map((row) => row.text), text.split(/(?<=[。！？；])/u).filter((part) => part.trim().length > 0));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('迁移补拆：0.51.0 拆出来的那条 130 字残留，会被再拆一次，且只拆一次', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'loom-self-resplit-'));
+  const text = '成长靠压缩，不靠累积：同样的注入预算里要多一句原理、少三条场景。定指标先问物理条件成不成立。做取舍先算代价。';
+  const blob = text;
+  const file = join(dir, 'store.json');
+  await writeFile(
+    file,
+    JSON.stringify({
+      memories: [],
+      summaries: [],
+      slots: [],
+      edges: [],
+      events: [],
+      // 模拟 0.51.0 的产物：一整条超长原理 + 一条迁移流水
+      self: {
+        core: null,
+        principles: [
+          {
+            id: 'p-legacy',
+            text: blob,
+            born: 1_700_000_000_000,
+            bornFrom: [],
+            evidence: { proven: 0, broken: 0, lastAt: null, lastPointer: null },
+            status: 'live',
+            retiredAt: null,
+            retiredReason: null,
+          },
+        ],
+        oplog: [{ id: 'o1', ts: 1_700_000_000_000, op: 'restore', target: null, before: null, after: blob, reason: '迁移', evidence: [], source: 'migrate' }],
+        versions: [],
+      },
+      selfNarrative: { current: { id: 'n1', text: blob, at: 1_700_000_000_000, reason: '迁移', source: 'compose', chars: [...blob].length }, versions: [] },
+    }),
+    'utf8',
+  );
+  const store = new MemoryStore({ storePath: file, compactAt: 0 });
+  try {
+    await store.open();
+    const first = store.livePrinciples();
+    assert.ok(first.length > 1, `残留那条应被按句拆开（现在是 ${first.length} 条）`);
+    assert.ok(store.selfOplog().some((row) => /补拆/.test(row.reason)), '补拆要留一条流水');
+    // 再开一次：条数不再变化（补拆天然幂等）
+    const count = first.length;
+    await store.open();
+    assert.equal(store.livePrinciples().length, count, '不许越拆越多');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('迁移是幂等的：再开一次不会长出第二批原理', async () => {
   const { dir, store } = await openLegacyStore();
   try {
