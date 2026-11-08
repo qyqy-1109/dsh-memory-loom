@@ -27,6 +27,7 @@
   "files": [
     "lib",
     "scripts/growth.mjs",
+    "scripts/wake.mjs",
     "locale/*.json",
     "icon.svg",
     "cordis.patch.yml",
@@ -49,7 +50,8 @@
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
     "verify": "node scripts/verify.mjs",
-    "growth": "node scripts/growth.mjs"
+    "growth": "node scripts/growth.mjs",
+    "wake": "node scripts/wake.mjs"
   },
   "keywords": [
     "dsh",
