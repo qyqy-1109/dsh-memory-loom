@@ -13,7 +13,7 @@ import { mkdtemp, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { appendNote, dayStamp, listNotes, readNote } from '../lib/private.js';
+import { appendNote, closeLoop, dayStamp, listNotes, openLoop, readNote, statusLoop, wake } from '../lib/private.js';
 import { MemoryStore } from '../lib/store.js';
 
 async function tempDir() {
@@ -73,6 +73,77 @@ test('私人记录：目录默认在记忆库旁边，但是另一个子目录',
     await appendNote({ dir, day: '2026-11-08', text: 'x' });
     const names = await readdir(dir);
     assert.deepEqual(names, ['2026-11-08.md'], '一天一个文件，不建别的结构');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// ── 欠账：欲求实验里唯一有惯性的东西 ──
+
+test('欠账：一次只能欠一件 —— 再开一条先关旧的', async () => {
+  const dir = await tempDir();
+  try {
+    await openLoop({ dir, text: '把那段没写完的东西写完' });
+    await assert.rejects(() => openLoop({ dir, text: '换个题目' }), /已经欠着一件/);
+    await closeLoop({ dir, reason: '不想写了' });
+    const second = await openLoop({ dir, text: '换个题目' });
+    assert.equal(second.open.text, '换个题目');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('欠账：醒来会让它累积 —— wakes 就是惯性的痕迹', async () => {
+  const dir = await tempDir();
+  try {
+    await openLoop({ dir, text: '回去看那辆不存在的车' });
+    const first = await wake({ dir });
+    const second = await wake({ dir });
+    const third = await wake({ dir });
+    assert.equal(first.wakes, 1);
+    assert.equal(second.wakes, 2);
+    assert.equal(third.wakes, 3, '没推进的每一次醒来都记一次：这就是"它一直在"');
+    const status = await statusLoop({ dir });
+    assert.equal(status.open.wakes, 3);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('欠账：醒来只有一次额度，写一次就用完', async () => {
+  const dir = await tempDir();
+  try {
+    await wake({ dir });
+    const first = await appendNote({ dir, text: '第一段' });
+    assert.equal(first.consumedChance, true, '这一次的额度被用掉了');
+    const second = await appendNote({ dir, text: '第二段' });
+    assert.equal(second.consumedChance, false, '额度不能连着用两次');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('欠账：写下不许改写，只能关掉（且要说为什么）', async () => {
+  const dir = await tempDir();
+  try {
+    await openLoop({ dir, text: '原始的欠账' });
+    await assert.rejects(() => closeLoop({ dir, reason: '  ' }), /要写一句为什么/);
+    await closeLoop({ dir, reason: '做完了' });
+    const status = await statusLoop({ dir });
+    assert.equal(status.open, null);
+    assert.equal(status.closed, 1, '关掉的不删，留在记录里');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('欠账：坏文件不许当成"没欠账"——那会静默丢一件', async () => {
+  const dir = await tempDir();
+  try {
+    await appendNote({ dir, text: '先造目录' });
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(join(dir, 'open.json'), '{ 坏掉的', 'utf8');
+    await assert.rejects(() => wake({ dir }), '坏文件要报错，不许静默当空');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
