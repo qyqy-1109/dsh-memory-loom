@@ -276,7 +276,11 @@ function captureComponent(loaded, slotName) {
         callback();
       },
       register(definition, target) {
-        registered.set(definition.name, target);
+        // 宿主的 main 是 **keyed** 槽、侧栏是 **id** 列：两者都能挂多项
+        // （记忆海 / 人格），所以按「槽名 + 它自己的键」登记，
+        // 否则后注册的那页会把前一页顶掉。
+        const slotKey = definition.key ?? definition.id ?? '';
+        registered.set(`${definition.name}::${slotKey}`, target);
         return () => {};
       },
     },
@@ -302,7 +306,7 @@ const isMemorySea = (node) => typeof node.type === 'function' && node.type.name 
 test('页面：记忆海铺满内容区，页头/侧栏/页脚与星图都在', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();
-  const page = captureComponent(loaded, 'main');
+  const page = captureComponent(loaded, 'main::memory-loom');
   const { tree, errors } = renderRoot(page, hooks);
   assert.deepEqual(errors.map((e) => e.message), [], '渲染与 effect 都不能抛错');
   const byClass = (name) => findAll(tree, (node) => String(node.props?.className ?? '').split(' ').includes(name));
@@ -328,7 +332,7 @@ test('历史页签：滑杆与那一刻的记忆列表都在（时间轴已从�
   globalThis.requestAnimationFrame = () => 1;
   globalThis.cancelAnimationFrame = () => {};
   const { loaded, hooks } = await loadPlugin();
-  const page = captureComponent(loaded, 'main');
+  const page = captureComponent(loaded, 'main::memory-loom');
   const { tree } = renderRoot(page, hooks);
   const sea = findAll(tree, isMemorySea)[0];
   assert.notEqual(sea, undefined, '页面里应有星图组件');
@@ -366,7 +370,7 @@ test('历史页签：滑杆与那一刻的记忆列表都在（时间轴已从�
 test('侧栏入口：是宿主导航栏里的一项，图标随尺寸与选中态变化', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();
-  const icon = captureComponent(loaded, 'sidebar.panellist');
+  const icon = captureComponent(loaded, 'sidebar.panellist::memory-loom');
   const { tree, errors } = renderRoot(() => icon({ size: 18, active: true }), hooks);
   assert.deepEqual(errors.map((e) => e.message), []);
   assert.equal(tree.type, 'svg', '入口应该是内联 SVG');
@@ -375,4 +379,29 @@ test('侧栏入口：是宿主导航栏里的一项，图标随尺寸与选中�
   assert.equal(findAll(tree, (node) => node.type === 'circle').length, 3, '三个星点');
   const dimmed = findAll(tree, (node) => node.type === 'circle' && node.props.opacity === 1);
   assert.ok(dimmed.length >= 1, '选中态下星点应更亮');
+});
+
+test('侧栏入口：记忆海与人格是并列的两项，不是一个页面里的两个页签', async () => {
+  installDom();
+  const { loaded, hooks } = await loadPlugin();
+  const seaIcon = captureComponent(loaded, 'sidebar.panellist::memory-loom');
+  const personaIcon = captureComponent(loaded, 'sidebar.panellist::memory-loom-persona');
+  assert.notEqual(personaIcon, undefined, '人格要有自己的导航入口');
+  const sea = renderRoot(() => seaIcon({ size: 16 }), hooks).tree;
+  const persona = renderRoot(() => personaIcon({ size: 16 }), hooks).tree;
+  assert.notDeepEqual(persona, sea, '两项不该是同一个图标：一个是星网，一个是内核');
+});
+
+test('人格页：单开一页（不是浮层），读不到数据时也不抛错、仍然是一整页', async () => {
+  installDom();
+  const { loaded, hooks } = await loadPlugin();
+  const page = captureComponent(loaded, 'main::memory-loom-persona');
+  const { tree, errors } = renderRoot(page, hooks);
+  assert.deepEqual(errors.map((e) => e.message), [], '渲染与 effect 都不能抛错');
+  const pageNode = findAll(tree, (node) => String(node.props?.className ?? '').split(' ').includes('ml-page'))[0];
+  assert.notEqual(pageNode, undefined, '人格必须占一整页');
+  assert.equal(pageNode.props.style?.position, undefined, '不许再用 fixed 浮层');
+  assert.equal(pageNode.props['aria-label'], '人格');
+  const backs = findAll(tree, (node) => node.type === 'button' && JSON.stringify(node.props.children).includes('返回'));
+  assert.deepEqual(backs, [], '页面上不应有返回按钮');
 });

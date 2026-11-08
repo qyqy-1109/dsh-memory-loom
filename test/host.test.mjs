@@ -230,68 +230,55 @@ test('HTTP：GET /memory-loom/api/state 返回快照与六层健康，且 no-sto
   }
 });
 
-test('HTTP：GET /api/growth 与 POST /api/narrative 走的是同一份库和同一套校验', async () => {
+test('HTTP：GET /api/self 与 POST /api/self 走的是同一份库和同一套校验', async () => {
   const env = await bootstrap();
   try {
     const [route] = env.routes;
 
-    // ① 成长读数是只读的：算一遍不能把库写脏
-    const growth = makeRes();
-    await route.handler(makeReq('GET', '/memory-loom/api/growth'), growth);
-    assert.equal(growth.statusCode, 200);
-    const report = JSON.parse(growth.body);
-    assert.ok(typeof report.headline === 'string' && report.headline.length > 0);
-    assert.equal(report.contract.chars, 0, '空库没有常量开销');
-    assert.equal(report.narrative.has, false, '还没有叙事时如实说没有');
-    assert.ok(Array.isArray(report.notes) && report.notes.length > 0);
+    // ① 人格页读数是只读的：读一遍不能把库写脏
+    const read = makeRes();
+    await route.handler(makeReq('GET', '/memory-loom/api/self'), read);
+    assert.equal(read.statusCode, 200);
+    const view = JSON.parse(read.body);
+    assert.equal(view.composed.chars, 0, '空库没有自我块');
+    assert.equal(view.core, null, '内核未定就是 null，不是空字符串');
+    assert.equal(view.budget.coreMax, 120, '预算随读一起给，面板不用自己记数');
+    assert.equal(view.budget.principleLimit, 9);
 
-    // ② 没写理由的重写要被挡下来，并且原因是给人看的
+    // ② 内核：面板能写；没写理由的要被挡，并且原因是给人看的
     const refused = makeRes();
-    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我是谁' }), refused);
+    await route.handler(makeReq('POST', '/memory-loom/api/self', { action: 'core', text: '我是谁' }), refused);
     assert.equal(refused.statusCode, 200, '校验失败是"填错了"，不是服务端故障');
     const refusedBody = JSON.parse(refused.body);
     assert.equal(refusedBody.ok, false);
     assert.ok(refusedBody.error.includes('理由'));
 
-    // ③ 正常重写：面板走 API 和工具走的是同一条 store 路径
-    const first = makeRes();
+    const core = makeRes();
     await route.handler(
-      makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我先量再下结论。', reason: '第一版' }),
-      first,
+      makeReq('POST', '/memory-loom/api/self', { action: 'core', text: '我先量再下结论。', reason: '第一次写内核' }),
+      core,
     );
-    const firstBody = JSON.parse(first.body);
-    assert.equal(firstBody.ok, true);
-    assert.equal(firstBody.chars, [...'我先量再下结论。'].length);
-    assert.equal(firstBody.versions, 0);
+    const coreBody = JSON.parse(core.body);
+    assert.equal(coreBody.ok, true);
+    assert.equal(coreBody.view.core.text, '我先量再下结论。');
+    assert.equal(coreBody.view.composed.chars, [...'我先量再下结论。'].length, '写内核就走同一条合成路径');
 
-    const second = makeRes();
+    // ③ 原理：API 和工具走同一个 store 校验 —— 没有证据加不进去
+    const noEvidence = makeRes();
     await route.handler(
-      makeReq('POST', '/memory-loom/api/narrative', { action: 'rewrite', text: '我先量，量完敢换口径。', reason: '第二版' }),
-      second,
+      makeReq('POST', '/memory-loom/api/self', { action: 'add', text: '先量再改', reason: '想加' }),
+      noEvidence,
     );
-    assert.equal(JSON.parse(second.body).versions, 1, '旧版必须进历史');
+    const noEvidenceBody = JSON.parse(noEvidence.body);
+    assert.equal(noEvidenceBody.ok, false);
+    assert.ok(noEvidenceBody.error.includes('证据'));
 
-    // ④ 回滚：换成旧版，当前版进历史
-    const read = makeRes();
-    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'read' }), read);
-    const readBody = JSON.parse(read.body);
-    assert.equal(readBody.current.text, '我先量，量完敢换口径。');
-    const target = readBody.history[0];
-
-    const restore = makeRes();
-    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'restore', id: target.id }), restore);
-    assert.equal(JSON.parse(restore.body).ok, true);
-
-    const after = makeRes();
-    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'read' }), after);
-    const afterBody = JSON.parse(after.body);
-    assert.equal(afterBody.current.text, '我先量再下结论。', '回滚后当前版是旧版');
-    assert.ok(afterBody.history.some((row) => row.text === '我先量，量完敢换口径。'), '被替换下来的那版还在');
-
-    // ⑤ 回滚到不存在的版本要明确失败
-    const missing = makeRes();
-    await route.handler(makeReq('POST', '/memory-loom/api/narrative', { action: 'restore', id: 'nope' }), missing);
-    assert.equal(JSON.parse(missing.body).ok, false);
+    // ④ 不认识的 action 不写库，只回读
+    const unknown = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/self', { action: 'rewrite', text: '整段重写' }), unknown);
+    const unknownBody = JSON.parse(unknown.body);
+    assert.equal(unknownBody.ok, true);
+    assert.equal(unknownBody.view.composed.chars, [...'我先量再下结论。'].length, '整段重写的入口已经没有了');
   } finally {
     await env.cleanup();
   }

@@ -200,10 +200,11 @@ await check('client: 成长页签在，且读数走宿主的同一份函数', ()
   if (!source.includes('function GrowthPane')) throw new Error('缺少成长页签的组件');
 });
 
-await check('client: 叙事编辑器必须带理由输入（不许绕过"理由必填"）', () => {
-  if (!source.includes("postAction('narrative'")) throw new Error('面板没有走叙事的 API');
-  if (!source.includes('为什么这次要改')) throw new Error('缺少理由输入框：历史就成了没有注释的文本');
-  if (!source.includes("action: 'restore'")) throw new Error('缺少回滚入口');
+await check('client: 人格页的内核编辑器必须带理由输入（不许绕过"理由必填"）', () => {
+  if (!source.includes("postAction('self'")) throw new Error('面板没有走人格的 API');
+  if (!source.includes('这次改了什么')) throw new Error('缺少理由输入框：成长记录就成了没有注释的文本');
+  if (source.includes("action: 'rewrite'")) throw new Error('整段重写的入口必须已经下线（只允许 add / merge / retire）');
+  if (!source.includes('「人格」页')) throw new Error('成长页签要指向人格页，否则人找不到编辑口');
 });
 
 await check('client: 迁移读数在面板里，且写明它的边界', () => {
