@@ -3,6 +3,18 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.55.0] - 2026-11-09
+
+### 改名
+- 项目从 `dsh-memory-loom`（记忆织机）改名为 **yu（余）**，npm 包名 `@qyqy-1109/yu`。
+  理由：它早就不只是记忆了 —— 一半是记忆，一半是人格；而"余"正好是这套东西的核心判断：
+  **成长靠压缩不靠累积，剩下的那部分才是你。**
+- **只改名字，不动里面的东西**：插件 id、HTTP 路由、日志前缀、数据目录**仍然是 `memory-loom`**。
+  改名不搬库，`~/.dsh/memory-loom/store.json` 原样可用。
+- 为什么带作用域：`dsh-*` 这类扁平包名在 npm 上基本分完了 —— 实测
+  `dsh-memory-loom`、`dsh-loom`、`dsh-strata`、`dsh-keel` 全被占（后两个还是相近的思路），
+  只空着 `dsh-selvedge`。作用域包永远不撞名。
+
 ## [0.54.0] - 2026-11-08
 
 ### 新增：欠账（一个小实验）

@@ -1,4 +1,14 @@
-# dsh-memory-loom
+# yu (余)
+
+Cross-session **memory + persona** layer for **DeepSeek Harness**: layered memory with write-path
+governance on one side, and a persona made of a locked core, a principles ledger and a choices ledger
+on the other.
+
+> Former name: `dsh-memory-loom`. It stopped being only about memory — half of it is now "who I am".
+> *yu* is the remainder after compression, which is the whole thesis: growth is compression, not accumulation.
+
+> npm package: `@qyqy-1109/yu`. The plugin id, HTTP routes and data directory **still say `memory-loom`**:
+> renaming does not move your store, `~/.dsh/memory-loom/store.json` keeps working.
 
 Cross-session memory for **DeepSeek Harness (DSH)** — governed writes, per-turn recall, and a visual memory map.
 

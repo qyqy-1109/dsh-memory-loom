@@ -1,8 +1,15 @@
-# dsh-memory-loom（记忆织机）
+# yu（余）
 
-给 **DeepSeek Harness** 用的跨会话记忆插件：写入有治理，读取出注入，状态可视，人格可长。
+给 **DeepSeek Harness** 用的跨会话**记忆 + 人格**层：记忆有分层与写路径治理，人格有内核、原理账本与取舍账本。
+
+> 旧名：`dsh-memory-loom`（记忆织机）。改名原因：它早就不只是记忆了 ——
+> 现在一半是记忆（发生过什么），一半是人格（我是谁）。而"余"正好是这套东西的核心判断：
+> **成长靠压缩不靠累积，剩下的那部分才是你。**
 
 > English: [README.en.md](README.en.md)（面板文案 zh/en 双语，记忆内容保持你写的原文）
+
+> npm 包名是 `@qyqy-1109/yu`，但插件内部标识、HTTP 路由与数据目录**仍然沿用 `memory-loom`** ——
+> 改名不搬库，`~/.dsh/memory-loom/store.json` 原样可用。
 
 设计直接搬自「旧识（old-acquaintance）」那套记忆架构，但按 DSH 的宿主能力重新落地 ——
 不是把 Python 服务搬过来，而是把**口径**搬过来：
@@ -46,12 +53,22 @@ dsh plugin --profile desktop add .
 
 ### 从 npm 装（可选）
 
-仓库自带 `.github/workflows/publish.yml`：在 GitHub 上打 tag（`v0.52.0` 这种）就会跑测试并
+仓库自带 `.github/workflows/publish.yml`：在 GitHub 上打 tag（`v0.55.0` 这种）就会跑测试并
 `npm publish`，需要先在仓库 Secrets 里配 `NPM_TOKEN`。发过之后可以一行装：
 
 ```sh
-dsh plugin --profile desktop add dsh-memory-loom
+dsh plugin --profile desktop add @qyqy-1109/yu
 ```
+
+> 为什么带作用域：`dsh-*` 这类扁平包名在 npm 上基本被分完了（我查的时候
+> `dsh-memory-loom`、`dsh-loom`、`dsh-strata`、`dsh-keel` 全被占，其中两个还是同一个思路）。
+> 作用域包永远不撞名。
+>
+> 也可以直接装 git 源（`dsh plugin` 只是转发给 pnpm，git spec 它认）：
+>
+> ```sh
+> dsh plugin --profile desktop add github:qyqy-1109/yu
+> ```
 
 ## 三层防爆（v0.22.0）
 
