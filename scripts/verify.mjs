@@ -213,6 +213,15 @@ await check('client: 成长记录里有按流水回退的入口（且回退理�
   if (!source.includes("action: 'restore'")) throw new Error('面板没有调回退的 API');
 });
 
+await check('client: 人格页必须自己轮询（写库的常常不是这一页）', () => {
+  const start = source.indexOf('function PersonaPage');
+  const body = start < 0 ? '' : source.slice(start, source.indexOf('function MemorySeaPage'));
+  if (!body.includes('setInterval(() => load(), 5000)')) {
+    throw new Error('人格页只在挂载时读一次：模型用 memory_self 写完，页面不会自己更新');
+  }
+  if (!body.includes('signatureRef')) throw new Error('轮询没有内容签名：每 5 秒会白掉一帧');
+});
+
 await check('host: 私人记录与记忆库在结构上不相通', () => {
   const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
