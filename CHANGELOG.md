@@ -3,6 +3,20 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.55.2] - 2026-11-09
+
+### 修复（改名的真正代价）
+- 0.55.0 改包名时漏了一处：`cordis.patch.yml` 里插入的那行插件条目写的是
+  `name: dsh-memory-loom`。加载器**按这个名字**去 profile 的 `node_modules` 里找模块，
+  名字对不上 → 插件整块装不上 → 侧栏「记忆海」「人格」一起消失，工具和注入也没了。
+  现在改成 `@qyqy-1109/yu`。
+- 加了 verify 守卫：`cordis.patch.yml` 里的 `name` 必须等于 `package.json` 的 `name`。
+  这条症状太误导（看着像面板坏了，其实是包解析失败），不该靠人记。
+
+### 教训
+包名不只活在一个地方：`package.json` / 本 bundle 的 patch / profile 的 `dependencies`
+与 `dsh.profile.bundles` / README 的安装命令。改名是把这五处一起改，不是改一个字符串。
+
 ## [0.55.1] - 2026-11-09
 
 ### 修复

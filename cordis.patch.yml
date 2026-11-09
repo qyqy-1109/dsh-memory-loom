@@ -1,6 +1,10 @@
-# dsh-memory-loom 的配置层：向 profile 插入一行插件条目。
+# yu（余）的配置层：向 profile 插入一行插件条目。
 # 后层按 id 覆盖前层，且 config 是整段替换（不是深合并）。
+#
+# 注意：`name` 必须和 package.json 的 `name` 一模一样 —— 加载器就是按这个名字
+# 去 profile 的 node_modules 里找模块的。改名只改 package.json 的话，
+# 这一行会指向一个不存在的包，插件整块装不上（服务端和客户端一起消失）。
 - insert:
     - id: memory-loom
-      name: dsh-memory-loom
+      name: "@qyqy-1109/yu"
       config: {}

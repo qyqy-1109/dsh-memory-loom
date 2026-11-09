@@ -213,6 +213,18 @@ await check('client: 成长记录里有按流水回退的入口（且回退理�
   if (!source.includes("action: 'restore'")) throw new Error('面板没有调回退的 API');
 });
 
+await check('host: bundle patch 里的 name 必须等于 package.json 的 name', () => {
+  // 加载器按这个名字去 profile 的 node_modules 里找模块。两者不一致 = 插件整块装不上，
+  // 而且症状很误导：服务端和客户端的侧栏入口一起消失，看起来像"面板坏了"。
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+  const patch = readFileSync(join(process.cwd(), 'cordis.patch.yml'), 'utf8');
+  const matched = /name:\s*"?([^"\s]+)"?/.exec(patch);
+  if (matched === null) throw new Error('cordis.patch.yml 里找不到 name');
+  if (matched[1] !== pkg.name) {
+    throw new Error(`包名不一致：package.json 是 ${pkg.name}，cordis.patch.yml 是 ${matched[1]} —— 改名要一起改`);
+  }
+});
+
 await check('client: 人格页必须自己轮询（写库的常常不是这一页）', () => {
   const start = source.indexOf('function PersonaPage');
   const body = start < 0 ? '' : source.slice(start, source.indexOf('function MemorySeaPage'));
