@@ -4,7 +4,11 @@
 # 注意：`name` 必须和 package.json 的 `name` 一模一样 —— 加载器就是按这个名字
 # 去 profile 的 node_modules 里找模块的。改名只改 package.json 的话，
 # 这一行会指向一个不存在的包，插件整块装不上（服务端和客户端一起消失）。
+#
+# 0.55.3 回退：这里改回 `dsh-memory-loom`。作用域的 npm 包名（@qyqy-1109/yu）
+# 还没验证过宿主认不认，而它一旦不认，代价是整个插件加载失败 + 用户被锁在外面。
+# 结论：npm 包名要改，等能在本地把"作用域名能不能装"验通之后再说，不在这一步赌。
 - insert:
     - id: memory-loom
-      name: "@qyqy-1109/yu"
+      name: "dsh-memory-loom"
       config: {}

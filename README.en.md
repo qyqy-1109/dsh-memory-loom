@@ -7,8 +7,10 @@ on the other.
 > Former name: `dsh-memory-loom`. It stopped being only about memory — half of it is now "who I am".
 > *yu* is the remainder after compression, which is the whole thesis: growth is compression, not accumulation.
 
-> npm package: `@qyqy-1109/yu`. The plugin id, HTTP routes and data directory **still say `memory-loom`**:
-> renaming does not move your store, `~/.dsh/memory-loom/store.json` keeps working.
+> The install identity is still `dsh-memory-loom`. A name is not a package name: the loader resolves
+> modules by package name from the profile's `node_modules`, so the code keeps `dsh-memory-loom`
+> while the project is called yu. Publishing to npm needs a scoped package, which is on hold until
+> "does the host accept a scoped name" is actually verified.
 
 Cross-session memory for **DeepSeek Harness (DSH)** — governed writes, per-turn recall, and a visual memory map.
 

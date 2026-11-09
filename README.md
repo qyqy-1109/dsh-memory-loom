@@ -2,14 +2,14 @@
 
 给 **DeepSeek Harness** 用的跨会话**记忆 + 人格**层：记忆有分层与写路径治理，人格有内核、原理账本与取舍账本。
 
-> 旧名：`dsh-memory-loom`（记忆织机）。改名原因：它早就不只是记忆了 ——
-> 现在一半是记忆（发生过什么），一半是人格（我是谁）。而"余"正好是这套东西的核心判断：
+> 名字是 **yu（余）**。*余* = 压缩之后剩下的那部分，也就是这套东西的核心判断：
 > **成长靠压缩不靠累积，剩下的那部分才是你。**
 
 > English: [README.en.md](README.en.md)（面板文案 zh/en 双语，记忆内容保持你写的原文）
 
-> npm 包名是 `@qyqy-1109/yu`，但插件内部标识、HTTP 路由与数据目录**仍然沿用 `memory-loom`** ——
-> 改名不搬库，`~/.dsh/memory-loom/store.json` 原样可用。
+> 安装身份仍然是 `dsh-memory-loom`。**"名字"和"包名"是两件事**：
+> 加载器按包名去 profile 的 `node_modules` 里找模块，所以代码里的包名保持 `dsh-memory-loom`，
+> 而项目对外叫 yu。想发布到 npm 再单独处理（`dsh-*` 扁平名已被占，见下文）。
 
 设计直接搬自「旧识（old-acquaintance）」那套记忆架构，但按 DSH 的宿主能力重新落地 ——
 不是把 Python 服务搬过来，而是把**口径**搬过来：
@@ -51,24 +51,14 @@ dsh plugin --profile desktop add .
 
 也可以直接给绝对路径：`dsh plugin --profile desktop add /path/to/dsh-memory-loom`。
 
-### 从 npm 装（可选）
+### 从 npm 装（还没做）
 
-仓库自带 `.github/workflows/publish.yml`：在 GitHub 上打 tag（`v0.55.0` 这种）就会跑测试并
-`npm publish`，需要先在仓库 Secrets 里配 `NPM_TOKEN`。发过之后可以一行装：
+`dsh-*` 这类扁平包名在 npm 上基本被分完了（实测 `dsh-memory-loom`、`dsh-loom`、`dsh-strata`、
+`dsh-keel` 全被占，后两个还是相近的思路）。想发布得用作用域包 `@用户名/yu`，
+**但那要先把"宿主认不认作用域名"验通**：0.55.0 试过，加载器那一关没过，
+插件整块装不上（服务端和客户端一起消失，用户被锁在启动报错里）。所以 0.55.3 先回退。
 
-```sh
-dsh plugin --profile desktop add @qyqy-1109/yu
-```
-
-> 为什么带作用域：`dsh-*` 这类扁平包名在 npm 上基本被分完了（我查的时候
-> `dsh-memory-loom`、`dsh-loom`、`dsh-strata`、`dsh-keel` 全被占，其中两个还是同一个思路）。
-> 作用域包永远不撞名。
->
-> 也可以直接装 git 源（`dsh plugin` 只是转发给 pnpm，git spec 它认）：
->
-> ```sh
-> dsh plugin --profile desktop add github:qyqy-1109/yu
-> ```
+在验通之前，用下面两种方式装。
 
 ## 三层防爆（v0.22.0）
 
