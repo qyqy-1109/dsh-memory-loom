@@ -3,6 +3,28 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.56.0] - 2026-11-09
+
+### 改名（这次验过了才动）
+- 正式改名为 **yu（余）**，包名 `@qyqy-1109/yu`。`package.json` 与 `cordis.patch.yml` 两处一起改；
+  profile 里先 add 新名、再 remove 旧名、再清掉旧的悬空软链。
+- **验证方式**（以后改身份类操作都按这个来）：拷贝项目到 `%TEMP%` → 只改两处名字 →
+  用 `--from-default-profile web` 建临时 profile 装上 → `--patch` 把 storePath 重定向到临时目录 →
+  `--port 0 --no-open` 起服务 → 查 `__DSH_BOOT__` 与插件 API。结果：
+  - 插件 API 应答 `serverVersion=0.55.3`，读的是临时库（不碰真库）；
+  - 启动日志无 `skipping profile bundle`；
+  - 启动清单里有 `{"id":"@qyqy-1109/yu","url":"plugins/??@qyqy-1109/yu/client.js&rev=…"}`，
+    能算出 rev 说明客户端 bundle 真被读到了。
+
+### 更正 0.55.0 的结论
+之前判定"宿主不认作用域名"是错的。0.55.0 那次启动崩溃的真实原因是**脏状态**：
+旧 `dsh-memory-loom` 软链 + 新 `@qyqy-1109/yu` 依赖 + 悬空链接同时存在，且 patch 里一个名字、
+package 里另一个名字。作用域本身没问题。
+
+### 附：0.55.3 回退
+包名临时回退到 `dsh-memory-loom`，修复"改名漏了 `cordis.patch.yml` 里的 name"导致的整块加载失败；
+同时给 verify 加了守卫：两处 name 不一致直接报错。
+
 ## [0.55.2] - 2026-11-09
 
 ### 修复（改名的真正代价）

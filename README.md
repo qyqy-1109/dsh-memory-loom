@@ -7,9 +7,9 @@
 
 > English: [README.en.md](README.en.md)（面板文案 zh/en 双语，记忆内容保持你写的原文）
 
-> 安装身份仍然是 `dsh-memory-loom`。**"名字"和"包名"是两件事**：
-> 加载器按包名去 profile 的 `node_modules` 里找模块，所以代码里的包名保持 `dsh-memory-loom`，
-> 而项目对外叫 yu。想发布到 npm 再单独处理（`dsh-*` 扁平名已被占，见下文）。
+> 安装身份：`@qyqy-1109/yu`（0.56.0 起正式改名；作用域名先在临时 profile 里验过才动）。
+> 插件内部 id、HTTP 路由与数据目录**仍然沿用 `memory-loom`** —— 改名不搬库，
+> `~/.dsh/memory-loom/store.json` 原样可用。
 
 设计直接搬自「旧识（old-acquaintance）」那套记忆架构，但按 DSH 的宿主能力重新落地 ——
 不是把 Python 服务搬过来，而是把**口径**搬过来：
@@ -51,14 +51,21 @@ dsh plugin --profile desktop add .
 
 也可以直接给绝对路径：`dsh plugin --profile desktop add /path/to/dsh-memory-loom`。
 
-### 从 npm 装（还没做）
+### 从 npm 装
 
 `dsh-*` 这类扁平包名在 npm 上基本被分完了（实测 `dsh-memory-loom`、`dsh-loom`、`dsh-strata`、
-`dsh-keel` 全被占，后两个还是相近的思路）。想发布得用作用域包 `@用户名/yu`，
-**但那要先把"宿主认不认作用域名"验通**：0.55.0 试过，加载器那一关没过，
-插件整块装不上（服务端和客户端一起消失，用户被锁在启动报错里）。所以 0.55.3 先回退。
+`dsh-keel` 全被占，后两个还是相近的思路），所以用作用域包。打 tag（`v0.56.0` 这种）会跑测试并
+`npm publish`，需要先在仓库 Secrets 里配 `NPM_TOKEN`。发过之后一行装：
 
-在验通之前，用下面两种方式装。
+```sh
+dsh plugin --profile desktop add @qyqy-1109/yu
+```
+
+> 也可以直接装 git 源（`dsh plugin` 只是转发给 pnpm，git spec 它认）：
+>
+> ```sh
+> dsh plugin --profile desktop add github:qyqy-1109/dsh-memory-loom
+> ```
 
 ## 三层防爆（v0.22.0）
 
