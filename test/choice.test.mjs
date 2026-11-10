@@ -106,19 +106,58 @@ test('取舍：聚合看分布，一边倒和五五开要分开说', async () =>
         choicePicked: picked,
       });
     }
-    const [group] = store.choiceSummary();
-    assert.equal(group.total, 4);
-    assert.equal(group.aCount, 3);
-    assert.equal(group.bCount, 1);
-    assert.equal(group.a, '先量再答');
+    const pickedTexts = store
+      .active()
+      .filter((row) => row.kind === 'choice' && row.choice !== null && row.choice.a === '先给个说法')
+      .map((row) => (row.choice.picked === 'a' ? row.choice.a : row.choice.b));
+    assert.equal(pickedTexts.filter((text) => text === '先量再答').length, 3, '三次选"先量再答"');
+    assert.equal(pickedTexts.filter((text) => text === '先给个说法').length, 1, '一次选"先给个说法"');
+    const byPair = store.choiceSummary().find((row) => [row.a, row.b].includes('先量再答'));
+    assert.equal(byPair.total, 4);
+    assert.equal(Math.max(byPair.aCount, byPair.bCount), 3, '一边 3 一边 1，与 a/b 字母无关');
 
     // 另一个两难，五五开
     await store.write({ kind: 'choice', text: '二选一', choiceA: '长', choiceB: '短', choicePicked: 'a' });
     await store.write({ kind: 'choice', text: '二选一', choiceA: '长', choiceB: '短', choicePicked: 'b' });
     const summary = store.choiceSummary();
-    const even = summary.find((row) => row.a === '长');
+    const even = summary.find((row) => [row.a, row.b].includes('长'));
     assert.equal(even.aCount, even.bCount, '五五开要如实呈现，不许四舍五入成偏好');
     assert.equal(store.selfView().choices.length, 2, '人格页要能读到这块');
+  } finally {
+    await close(dir);
+  }
+});
+
+test('取舍：a/b 的位置由代码定序，写的人无权决定（picked 不许恒等于 b）', async () => {
+  // 真实教训：前 12 条全是 picked=b，因为我习惯把"我选的那条"写在 b。
+  // 位置被当成结论之后，picked 就没有信息量了。所以服务端按码点定序，语义不变。
+  const { dir, store } = await openTempStore();
+  try {
+    const chosen = 'zzz 我真正选的那条';
+    const other = 'aaa 另一条路';
+    // 故意把"选中的"写在 a、且它在码点上更大 —— 服务端应该把它挪到 b，并把 picked 翻成 b
+    const result = await store.write({
+      kind: 'choice',
+      text: '位置无关性',
+      choiceA: chosen,
+      choiceB: other,
+      choicePicked: 'a',
+    });
+    const row = store.byId(result.id);
+    assert.deepEqual(row.choice, { a: other, b: chosen, picked: 'b' });
+    // 语义不变：我选的仍然是那句 zzz
+    const pickedText = row.choice.picked === 'a' ? row.choice.a : row.choice.b;
+    assert.equal(pickedText, chosen, '排序只许改位置，不许改"选了哪条"');
+
+    // 反过来：本来就已定序的输入不动
+    const second = await store.write({
+      kind: 'choice',
+      text: '位置无关性 2',
+      choiceA: other,
+      choiceB: chosen,
+      choicePicked: 'b',
+    });
+    assert.deepEqual(store.byId(second.id).choice, { a: other, b: chosen, picked: 'b' });
   } finally {
     await close(dir);
   }
