@@ -253,6 +253,13 @@ await check('host: 压缩按冗余触发，且原文不许被修剪掉', () => {
   }
 });
 
+await check('client: 两页都包在错误边界里（白屏不许再发生）', () => {
+  if (!source.includes('class PaneBoundary extends React.Component')) throw new Error('没有错误边界');
+  if (!source.includes("withBoundary(MemorySeaPage, '记忆海')")) throw new Error('记忆海没包边界');
+  if (!source.includes("withBoundary(PersonaPage, '人格')")) throw new Error('人格页没包边界');
+  if (!source.includes("kind: 'render-error'")) throw new Error('渲染错误没有写进 diag，排查只能靠猜');
+});
+
 await check('client: 时间轴可以收起，选择记在本地', () => {
   if (!source.includes('memory-loom:timeline')) throw new Error('时间轴没有记住用户的收起/展开选择');
   if (!source.includes("timelineOpen ? '收起' : '展开'")) throw new Error('缺少收起/展开按钮');

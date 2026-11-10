@@ -3,6 +3,20 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.63.0] - 2026-11-10
+
+### 修复：白屏本身是缺陷
+- 点开一条记忆详情会整页白掉。我离线把 `Detail` 用真形状的一行渲染过，**没复现**——
+  所以这一版先修"白屏"这件事本身：两页外面各包一层错误边界（`PaneBoundary`），
+  渲染异常不再卸掉整页，而是就地显示错误原因 + 「再试一次」，
+  同时把 message / stack / componentStack 写进 `/api/diag`（落 `client-diag.log`）。
+- 以前这种问题只能靠猜，或者靠用户会开 devtools；现在有日志。
+- `Detail` 与两页本体导进 `__internals`，加了一条离线重放测试：拿 `/api/state` 真实返回形状
+  的一行渲染详情，不许抛错。以后谁改详情，这条会先响。
+
+### 顺带
+- 测试桩补上 `React.Component`（错误边界要用 class 组件，桩里没有就整包加载失败）。
+
 ## [0.62.0] - 2026-11-10
 
 规格：`docs/specs/compaction-v2.md`。把"总结 → 当作记忆 → 再总结"这条循环装好闸。

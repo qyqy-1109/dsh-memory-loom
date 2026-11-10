@@ -139,6 +139,16 @@ function createHooks() {
   const api = {
     createElement,
     Fragment: 'fragment',
+    /** 错误边界要用 class 组件，React.Component 是它的一部分，桩里也得有。 */
+    Component: class Component {
+      constructor(props) {
+        this.props = props;
+        this.state = {};
+      }
+      setState(next) {
+        this.state = { ...this.state, ...(typeof next === 'function' ? next(this.state) : next) };
+      }
+    },
     useState(initial) {
       const index = cursor;
       cursor += 1;
@@ -306,7 +316,9 @@ const isMemorySea = (node) => typeof node.type === 'function' && node.type.name 
 test('页面：记忆海铺满内容区，页头/侧栏/页脚与星图都在', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();
-  const page = captureComponent(loaded, 'main::memory-loom');
+  const page = loaded.__internals.MemorySeaPage;
+  const registered = captureComponent(loaded, 'main::memory-loom');
+  assert.equal(typeof registered, 'function', '注册到 main 槽的是一层包了错误边界的组件');
   const { tree, errors } = renderRoot(page, hooks);
   assert.deepEqual(errors.map((e) => e.message), [], '渲染与 effect 都不能抛错');
   const byClass = (name) => findAll(tree, (node) => String(node.props?.className ?? '').split(' ').includes(name));
@@ -332,7 +344,7 @@ test('历史页签：滑杆与那一刻的记忆列表都在（时间轴已从�
   globalThis.requestAnimationFrame = () => 1;
   globalThis.cancelAnimationFrame = () => {};
   const { loaded, hooks } = await loadPlugin();
-  const page = captureComponent(loaded, 'main::memory-loom');
+  const page = loaded.__internals.MemorySeaPage;
   const { tree } = renderRoot(page, hooks);
   const sea = findAll(tree, isMemorySea)[0];
   assert.notEqual(sea, undefined, '页面里应有星图组件');
@@ -367,6 +379,55 @@ test('历史页签：滑杆与那一刻的记忆列表都在（时间轴已从�
   assert.equal(nowButton.props.disabled, false);
 });
 
+test('详情：拿真形状的一行渲染，不能抛错（白屏就是这里抛的）', async () => {
+  installDom();
+  const { loaded, hooks } = await loadPlugin();
+  const { Detail } = loaded.__internals;
+  assert.notEqual(Detail, undefined, '详情组件要能被离线重放');
+  // 这一行的字段是照 /api/state 真实返回的形状抄的，少一个都会跟线上不一样
+  const memory = {
+    id: 'm-detail',
+    kind: 'fact',
+    kindLabel: '事实',
+    text: '这条记忆有出处，也有被别人用过',
+    actor: 'user',
+    scene: null,
+    significance: null,
+    eventDate: null,
+    choice: null,
+    hits: 2,
+    usedCount: 0,
+    revisedCount: 0,
+    explicit: false,
+    status: 'active',
+    createdAt: Date.now() - 86_400_000,
+    updatedAt: Date.now(),
+    archivedAt: null,
+    archivedReason: null,
+    summarizedBy: null,
+    sources: ['a', 'b'],
+    derivedBy: 1,
+    supersedes: [],
+    slot: false,
+    age: '1 天前',
+  };
+  const { tree, errors } = renderRoot(
+    () =>
+      Detail({
+        memory,
+        ordered: [memory],
+        halfLifeDays: 30,
+        onAction: () => {},
+        busy: false,
+        onTrace: () => {},
+        onAblate: undefined,
+      }),
+    hooks,
+  );
+  assert.deepEqual(errors.map((error) => error.message), [], '详情渲染不许抛错');
+  assert.notEqual(tree, null);
+});
+
 test('侧栏入口：是宿主导航栏里的一项，图标随尺寸与选中态变化', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();
@@ -395,7 +456,8 @@ test('侧栏入口：记忆海与人格是并列的两项，不是一个页面�
 test('人格页：单开一页（不是浮层），读不到数据时也不抛错、仍然是一整页', async () => {
   installDom();
   const { loaded, hooks } = await loadPlugin();
-  const page = captureComponent(loaded, 'main::memory-loom-persona');
+  const page = loaded.__internals.PersonaPage;
+  captureComponent(loaded, 'main::memory-loom-persona');
   const { tree, errors } = renderRoot(page, hooks);
   assert.deepEqual(errors.map((e) => e.message), [], '渲染与 effect 都不能抛错');
   const pageNode = findAll(tree, (node) => String(node.props?.className ?? '').split(' ').includes('ml-page'))[0];
