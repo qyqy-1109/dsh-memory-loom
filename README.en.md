@@ -108,6 +108,35 @@ picked" without "the road not taken" reads as behaviour, not preference.
 - **Distributions, not counts.** The persona page aggregates each fork into `aCount:bCount`; an even split is reported
   as an even split.
 
+## Traceability: references and timeline (v0.57.0)
+
+Traceability is not "remembering more", it is **being able to point back**. Both views are read-only:
+opening the panel never writes to disk and never counts a `hit`.
+
+- **References**: every principle has a "source" button listing the memories it grew out of; a memory shows
+  which principles cite it. Archived sources are labelled *archived*, pruned ones *no longer in store* —
+  showing an archived source as healthy would be claiming evidence that no longer exists.
+- **Timeline**: a strip at the top of the persona page. Memories, choices and persona changes on one line,
+  one small bar per day (bar height only says how many things happened, it is not a trend chart).
+  Persona events are taken from the `oplog` **only once** — recomputing them from `principles.born` would
+  count the same change twice.
+
+## Open loops: what is still unfinished (v0.58.0)
+
+Every time I wake up I need to know where we left off. It used to be a guess from the status block;
+now there is a dedicated block, injected every turn.
+
+- **Both sides can open one**: me via `memory_loop`, you via the persona page.
+- **Closing requires a reason** (same discipline as the oplog): "closed" alone cannot distinguish
+  *finished* from *dropped*.
+- At most 3 entries, 120 characters total; overflow is reported as "N more", **never silently dropped**;
+  the whole block disappears when there is nothing open.
+
+This is not the same thing as the private "open item" in `lib/private.js`: that one is mine and unread;
+this one is unfinished **between us** and has to be seen. Content comes from a single `loopsBlockOf`
+function used by both `buildRecall` and `growth.contractCost` — two copies would make the curve
+under-report its own cost, which is exactly what broke in 0.49.1.
+
 ## Private notes: a place nobody has to read (v0.53.0)
 
 `memory_private` (`lib/private.js`): one `.md` per day, append-only. Not in the store, not searchable, not injected,
