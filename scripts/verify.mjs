@@ -111,8 +111,8 @@ await check('host: 没有 default 导出（否则 loader 会丢掉 inject 声明
   if (typeof host.apply !== 'function') throw new Error('missing apply export');
 });
 
-await check('host: 注册了 7 个工具', () => {
-  if (captured.tools.length !== 7) throw new Error(`expected 7 tools, got ${captured.tools.length}`);
+await check('host: 注册了 8 个工具', () => {
+  if (captured.tools.length !== 8) throw new Error(`expected 8 tools, got ${captured.tools.length}`);
 });
 
 for (const tool of captured.tools) {
@@ -234,6 +234,16 @@ await check('client: 人格页必须自己轮询（写库的常常不是这一�
   if (!body.includes('signatureRef')) throw new Error('轮询没有内容签名：每 5 秒会白掉一帧');
 });
 
+await check('host: 还没说完的线索有硬上限，注入与读数用同一份产出', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  const growthSource = readFileSync(join(process.cwd(), 'lib', 'growth.js'), 'utf8');
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!storeSource.includes('export function loopsBlockOf')) throw new Error('缺少统一的线索块产出函数');
+  if (!growthSource.includes('loopsBlockOf')) throw new Error('成长读数没算这一块：曲线又会替自己的开销打掩护');
+  if (!hostSource.includes("name: 'memory_loop'")) throw new Error('缺少记线索的工具');
+  if (!source.includes('还没说完')) throw new Error('面板上没有这一块');
+});
+
 await check('host: 引用链与时间轴两个只读路由都在', () => {
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
   for (const route of ['api/trace', 'api/timeline']) {
@@ -246,8 +256,9 @@ await check('host: 引用链与时间轴两个只读路由都在', () => {
 await check('host: 私人记录与记忆库在结构上不相通', () => {
   const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
-  if (/private\.js/.test(storeSource)) {
-    throw new Error('store.js 引用了 private.js：私人记录会漏进检索与注入，那块地方就废了');
+  // 只看真正的 import，不看注释里提到这个名字
+  if (/from\s+['"][^'"]*private\.js['"]/.test(storeSource)) {
+    throw new Error('store.js import 了 private.js：私人记录会漏进检索与注入，那块地方就废了');
   }
   if (!hostSource.includes("name: 'memory_private'")) throw new Error('缺少 private 记录的写入口');
   if (!existsSync(join(process.cwd(), 'lib', 'private.js'))) throw new Error('缺少 private.js');

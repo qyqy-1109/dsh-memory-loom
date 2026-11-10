@@ -444,7 +444,7 @@ test('人格页：太极为阳 —— 亮/暖/近/实/一，且不许借用深�
   assert.ok(source.includes('.ml-yang .ml-core-text'), '内核要有一档自己的大字');
   // 五组对立里最关键的一组：一 vs 多 —— 主体与注脚必须在结构上分得开
   assert.ok(body.includes("'data-main': 'true'"), '内核必须是这一页唯一的主体');
-  assert.equal((body.match(/'data-aside': 'true'/g) ?? []).length, 5, '时间轴 + 四块注脚');
+  assert.equal((body.match(/'data-aside': 'true'/g) ?? []).length, 6, '时间轴 + 五块注脚');
   // 阳是实：用量是 3px 实心条；成长记录是实心点，不是记忆海那张网
   assert.ok(/\.ml-yang \.ml-hair\{position:relative;height:3px/.test(source), '用量条要实心、加粗');
   assert.ok(source.includes('.ml-yang .ml-tl::before'), '成长记录要有自己的点');

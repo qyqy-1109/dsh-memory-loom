@@ -115,12 +115,13 @@ test('store 路径：默认落在 $DSH_HOME/memory-loom/store.json', () => {
   assert.equal(resolveStorePath({ storePath: 'D:\\tmp\\x.json' }), 'D:\\tmp\\x.json');
 });
 
-test('apply：注册 7 个工具、1 段 prompt、1 条 HTTP 前缀路由和 pre-step 监听', async () => {
+test('apply：注册 8 个工具、1 段 prompt、1 条 HTTP 前缀路由和 pre-step 监听', async () => {
   const env = await bootstrap();
   try {
     const names = env.tools.map((tool) => tool.name).sort();
     assert.deepEqual(names, [
       'memory_forget',
+      'memory_loop',
       'memory_private',
       'memory_restore',
       'memory_search',
