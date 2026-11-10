@@ -232,6 +232,38 @@ test('HTTP：GET /memory-loom/api/state 返回快照与六层健康，且 no-sto
   }
 });
 
+test('memory_search：一条都没命中时按时间兜底（语义那一路空了要能看出来）', async () => {
+  const env = await bootstrap();
+  try {
+    const session = { id: 's-fallback' };
+    const write = env.tools.find((tool) => tool.name === 'memory_write');
+    const search = env.tools.find((tool) => tool.name === 'memory_search');
+    await write.execute({ kind: 'fact', text: '用户家的猫叫豆豆，三岁，怕吹风机' }, { agent: { session } });
+
+    // ① 搜得到的时候不该给兜底
+    const hit = await search.execute({ query: '猫 豆豆' }, { agent: { session } });
+    assert.ok(hit.results.length > 0, '前提：这条本来搜得到');
+    assert.equal(hit.fallback, undefined, '有命中就不该再给按时间的兜底');
+
+    // ② 一条都搜不到、又没自己给时间窗 —— 兜底列最近七天
+    const miss = await search.execute({ query: '量子色动力学的重整化' }, { agent: { session } });
+    assert.equal(miss.results.length, 0);
+    assert.notEqual(miss.fallback, undefined, '语义空手时必须兜底，否则我只知道空手');
+    assert.equal(miss.fallback.days, 7);
+    assert.ok(miss.fallback.results.some((row) => row.text.includes('豆豆')), '兜底按时间列，最近写的必须在里面');
+
+    // ③ 用户自己给了时间窗就不要再叠一层兜底
+    const ranged = await search.execute(
+      { query: '量子色动力学的重整化', since: '2020-01-01', until: '2020-01-02' },
+      { agent: { session } },
+    );
+    assert.equal(ranged.results.length, 0);
+    assert.equal(ranged.fallback, undefined, '已经按时间问过了，不该再兜一层');
+  } finally {
+    await env.cleanup();
+  }
+});
+
 test('HTTP：GET /api/self 与 POST /api/self 走的是同一份库和同一套校验', async () => {
   const env = await bootstrap();
   try {
