@@ -5,10 +5,11 @@
 # 去 profile 的 node_modules 里找模块的。改名只改 package.json 的话，
 # 这一行会指向一个不存在的包，插件整块装不上（服务端和客户端一起消失）。
 #
-# 0.56.0 正式改名：这里跟 package.json 一起换成作用域包名。
-# 这一步先在临时 profile 里验过了（插件的 API 应答、启动清单里有客户端 bundle 且带 rev、日志无 skip），
-# 才敢动生产环境。
+# 0.56.1 回退：作用域名在**临时 web profile** 里验得过，但在**桌面（Electron 托管）profile**
+# 里失败 —— 启动时插件被踢出 bundles，用户被锁在外面。
+# 定论：桌面 profile 的加载路径和 web profile 不是同一条，前者命令行连 --dump-config 都不许。
+# 所以名字可以叫 yu，包名继续用 dsh-memory-loom；要换包名必须走应用内的插件管理，不走命令行。
 - insert:
     - id: memory-loom
-      name: "@qyqy-1109/yu"
+      name: "dsh-memory-loom"
       config: {}
