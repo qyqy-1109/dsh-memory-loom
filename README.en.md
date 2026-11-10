@@ -44,8 +44,8 @@ Cross-session memory for **DeepSeek Harness (DSH)** — governed writes, per-tur
 ## Install
 
 ```sh
-git clone https://github.com/qyqy-1109/dsh-memory-loom.git
-cd dsh-memory-loom
+git clone https://github.com/qyqy-1109/dsh-yu.git
+cd dsh-yu
 dsh plugin --profile desktop add .
 # restart DSH afterwards (profile bundle + manifest changes are not part of HMR)
 ```

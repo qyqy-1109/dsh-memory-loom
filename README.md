@@ -38,8 +38,8 @@
 
 ```sh
 # 1) 拿到源码
-git clone https://github.com/qyqy-1109/dsh-memory-loom.git
-cd dsh-memory-loom
+git clone https://github.com/qyqy-1109/dsh-yu.git
+cd dsh-yu
 
 # 2) 装进某个 profile（desktop 是桌面版默认 profile）
 dsh plugin --profile desktop add .
@@ -64,7 +64,7 @@ dsh plugin --profile desktop add @qyqy-1109/yu
 > 也可以直接装 git 源（`dsh plugin` 只是转发给 pnpm，git spec 它认）：
 >
 > ```sh
-> dsh plugin --profile desktop add github:qyqy-1109/dsh-memory-loom
+> dsh plugin --profile desktop add github:qyqy-1109/dsh-yu
 > ```
 
 ## 三层防爆（v0.22.0）
