@@ -244,6 +244,11 @@ await check('host: 还没说完的线索有硬上限，注入与读数用同一�
   if (!source.includes('还没说完')) throw new Error('面板上没有这一块');
 });
 
+await check('client: 时间轴可以收起，选择记在本地', () => {
+  if (!source.includes('memory-loom:timeline')) throw new Error('时间轴没有记住用户的收起/展开选择');
+  if (!source.includes("timelineOpen ? '收起' : '展开'")) throw new Error('缺少收起/展开按钮');
+});
+
 await check('host: 引用链与时间轴两个只读路由都在', () => {
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
   for (const route of ['api/trace', 'api/timeline']) {
