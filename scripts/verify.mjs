@@ -253,6 +253,16 @@ await check('host: 压缩按冗余触发，且原文不许被修剪掉', () => {
   }
 });
 
+await check('client: showTrace 每页各有一份，出处面板只有一处实现', () => {
+  const defs = source.split('const showTrace = React.useCallback').length - 1;
+  if (defs < 2) throw new Error(`showTrace 只定义了 ${defs} 份：另一页引用它会 ReferenceError（0.61 就是这么白屏的）`);
+  if (!source.includes('function TracePanel')) throw new Error('出处面板没有统一实现');
+  if (!source.includes("h(TracePanel, { trace, onClose: () => setTrace(null) })")) throw new Error('人格页没用统一面板');
+  const seaStart = source.indexOf('function MemorySeaPage');
+  const seaBody = seaStart < 0 ? '' : source.slice(seaStart, seaStart + 60_000);
+  if (!seaBody.includes('h(TracePanel')) throw new Error('记忆海这边没挂出处面板');
+});
+
 await check('client: 两页都包在错误边界里（白屏不许再发生）', () => {
   if (!source.includes('class PaneBoundary extends React.Component')) throw new Error('没有错误边界');
   if (!source.includes("withBoundary(MemorySeaPage, '记忆海')")) throw new Error('记忆海没包边界');
