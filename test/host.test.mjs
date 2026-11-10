@@ -682,3 +682,89 @@ test('使用信号：下一轮说到同一条记忆的指纹词，才算「用�
     await env.cleanup();
   }
 });
+
+test('HTTP：POST /memory-loom/api/ablate 一次只测一条，目标没进上下文就不硬跑', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'loom-ablate-host-'));
+  try {
+    const { ctx, tools, routes, listeners } = makeCtx();
+    const streams = [];
+    ctx.llm = {
+      async listProviders() {
+        return ['p1'];
+      },
+      async listModels() {
+        return ['m1'];
+      },
+      async prepareCall(config) {
+        return { config };
+      },
+      async *stream(request) {
+        streams.push(request);
+        // 按注入块里有没有这条的正文来判断 —— 注入块的 <memory-loom> 外壳两组都有一份，
+        // 用外壳当判据会把两组看成一样（那不是实验失败，是断言写错）
+        const text = request?.messages?.[0]?.content?.[0]?.text ?? '';
+        const withIt = text.includes('消融实验要把这一条摘掉（');
+        yield { type: 'text-delta', index: 0, text: withIt ? '带这一条的回答' : '不带这一条的回答' };
+        yield { type: 'finish', reason: { kind: 'stop' } };
+      },
+    };
+    apply(ctx, { storePath: join(dir, 'store.json'), injectRecall: true });
+
+    const write = tools.find((tool) => tool.name === 'memory_write');
+    const target = await write.execute({ kind: 'fact', text: '消融实验要把这一条摘掉' }, {});
+    await write.execute({ kind: 'fact', text: '消融实验里另一条不该被摘掉的' }, {});
+
+    // 先走一轮 pre-step：消融默认要拿「你上一轮那句话」当问题
+    const preStep = listeners.find((entry) => entry.event === 'agent/pre-step').handler;
+    await preStep({ agent: { session: { id: 's-ablate' } }, step: 1, turn: 1, signal: { aborted: false } }, async () => ({
+      kind: 'enter',
+      messages: [{ role: 'user', content: [{ type: 'text', text: '消融实验 摘掉 这一条' }] }],
+    }));
+
+    const [route] = routes;
+    const res = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/ablate', { id: target.id }), res);
+    assert.equal(res.statusCode, 200);
+    const payload = JSON.parse(res.body);
+    assert.equal(payload.injected, true, '这一问确实把它召回到了，才谈得上对照');
+    assert.equal(payload.withMemory.text, '带这一条的回答');
+    assert.equal(payload.withoutMemory.text, '不带这一条的回答');
+    assert.equal(streams.length, 2, '正好两次生成');
+    assert.equal(streams[0].purpose, 'memory-loom-ablate');
+    const first = streams[0].messages[0].content[0].text;
+    const second = streams[1].messages[0].content[0].text;
+    assert.ok(
+      first.includes('消融实验要把这一条摘掉（') && !second.includes('消融实验要把这一条摘掉（'),
+      '两次之间唯一允许的差别就是有没有这一条',
+    );
+
+    // 库里没有这条：404，不许假装测过
+    const missing = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/ablate', { id: 'ghost-id', question: '消融实验' }), missing);
+    assert.equal(missing.statusCode, 404);
+
+    // 有这条、但这问没把它召回上来：不做生成，直说拿不拿掉都一样
+    const unrelated = await write.execute({ kind: 'fact', text: '完全不相干的一件事：他喜欢下雨天' }, {});
+    streams.length = 0;
+    const skipped = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/ablate', { id: unrelated.id, question: '消融实验要把这一条摘掉' }), skipped);
+    const skippedBody = JSON.parse(skipped.body);
+    assert.equal(skippedBody.injected, false);
+    assert.match(String(skippedBody.note ?? ''), /召回/);
+    assert.equal(streams.length, 0, '目标不在上下文里时一次生成都不许跑');
+
+    // 消融是实验不是读数：跑完不许往库里记任何东西
+    const before = await readFile(join(dir, 'store.json'), 'utf8');
+    const again = makeRes();
+    await route.handler(makeReq('POST', '/memory-loom/api/ablate', { id: target.id }), again);
+    const after = JSON.parse(await readFile(join(dir, 'store.json'), 'utf8'));
+    const beforeState = JSON.parse(before);
+    assert.deepEqual(
+      after.memories.map((row) => ({ id: row.id, hits: row.hits, usedCount: row.usedCount })),
+      beforeState.memories.map((row) => ({ id: row.id, hits: row.hits, usedCount: row.usedCount })),
+      '消融不该动 hits / usedCount',
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });
+  }
+});

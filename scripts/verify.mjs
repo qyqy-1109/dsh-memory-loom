@@ -258,6 +258,33 @@ await check('host: 引用链与时间轴两个只读路由都在', () => {
   if (!source.includes('api/timeline?days=')) throw new Error('面板没有去拉时间轴');
 });
 
+await check('host: 召回快照必须带出每块的 ids（否则「这一轮想起了哪几条」根本没传出去）', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  if (!/blocks: blocks\.map\(\(block\) => \(\{[\s\S]{0,500}?ids:/.test(storeSource)) {
+    throw new Error('buildRecall 返回的 blocks 没带 ids：消融会永远判成"没召回"，引用链也说不清想起了哪几条');
+  }
+});
+
+await check('host: 出处（sources）写得进、落得下、反查得到', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!hostSource.includes('sources: {')) throw new Error('memory_write 的 schema 里没有 sources');
+  if (!storeSource.includes('row.sources.push(sourceId)')) throw new Error('写入时没有把出处落到条目上');
+  if (!storeSource.includes("edge: 'derived'")) throw new Error('引用链没把「被拿去用了」这条边标出来');
+  if (!storeSource.includes('derivedBy')) throw new Error('面板快照没有 derivedBy：看不出哪条被用上了');
+});
+
+await check('host: 消融是单条实验，不做排行', () => {
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!hostSource.includes('api/ablate')) throw new Error('缺少消融路由');
+  if (!existsSync(join(process.cwd(), 'lib', 'ablate.js'))) throw new Error('缺少 ablate.js');
+  if (!source.includes('消融一次')) throw new Error('面板上没有消融入口');
+  if (!source.includes('不等于那一轮真被用上了')) {
+    throw new Error('消融的边界说明被删了：抽样一旦被当统计读，就是 used 那个坑换了个坑口');
+  }
+  if (!source.includes("'用上了'")) throw new Error('引用链里没把「用上了」和「被引用」分开标');
+});
+
 await check('host: 私人记录与记忆库在结构上不相通', () => {
   const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
