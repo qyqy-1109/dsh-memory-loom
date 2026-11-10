@@ -336,6 +336,14 @@ const registrations = [];
 const fakeReact = {
   createElement: (...args) => ({ type: 'element', args }),
   Fragment: Symbol('Fragment'),
+  /** 错误边界是 class 组件，桩里也必须有 React.Component。 */
+  Component: class Component {
+    constructor(props) {
+      this.props = props;
+      this.state = {};
+    }
+    setState() {}
+  },
   useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
   useEffect: () => {},
   useRef: () => ({ current: null }),
