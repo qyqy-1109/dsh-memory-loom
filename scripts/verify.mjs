@@ -244,6 +244,15 @@ await check('host: 还没说完的线索有硬上限，注入与读数用同一�
   if (!source.includes('还没说完')) throw new Error('面板上没有这一块');
 });
 
+await check('host: 压缩按冗余触发，且原文不许被修剪掉', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  if (!storeSource.includes('compactCooldownMs')) throw new Error('压缩又回到"库存到 1200 才跑"了');
+  if (!storeSource.includes('summarizedBy == null')) throw new Error('归档修剪没跳过被摘要盖住的原文：摘要会指着空气');
+  if (!storeSource.includes("export const EVICTABLE = new Set(['fact', 'self', 'episode'])")) {
+    throw new Error('EVICTABLE 变了：summary 不许进可压缩集合（两代封顶）');
+  }
+});
+
 await check('client: 时间轴可以收起，选择记在本地', () => {
   if (!source.includes('memory-loom:timeline')) throw new Error('时间轴没有记住用户的收起/展开选择');
   if (!source.includes("timelineOpen ? '收起' : '展开'")) throw new Error('缺少收起/展开按钮');

@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory-loom",
-  "version": "0.61.0",
+  "version": "0.62.0",
   "description": "yu（余）= 压缩之后剩下的那部分。给 DeepSeek Harness 的跨会话记忆与人格层：记忆有四层、写路径治理、按当前输入召回；人格有内核、原理账本、取舍账本和一块不给别人看的私人记录。",
   "repository": {
     "type": "git",
