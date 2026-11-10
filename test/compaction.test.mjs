@@ -120,6 +120,31 @@ test('闸三：跟簇主题对不上的例外留在活跃', async () => {
   }
 });
 
+test('离群判据是相对的：低相似度的簇不许被整组判死', async () => {
+  const { dir, store } = await openTempStore({ summaryMinMembers: 3, summaryOutlierFloor: 0.18 });
+  try {
+    /**
+     * 真库实测：同一个簇里两两相似度只有 0.08–0.26（IDF 覆盖率本来就压得低）。
+     * 绝对地板 0.18 会把 22 条的簇筛成 4 条、7 条的簇筛成 1-2 条 —— 一条摘要都压不出来。
+     * 这里用一批"共享词但措辞各异"的条目复现那个形状。
+     */
+    const loose = [
+      '压缩触发线定在 1200 条，小库永远到不了，摘要层三个月没动',
+      '摘要的原文要是被归档修剪删掉，指针就断了，撤销也回不去',
+      '两代封顶这一条得靠测试锁住，不然摘要会被再压成摘要',
+      '例外条目最值钱，压缩时把它留在活跃里，别一起吸走',
+      '撤销率高说明聚类判据有问题，该回头改判据',
+      '压不出来就空跑一次，几毫秒而已，比永远不跑强',
+    ];
+    for (const text of loose) await store.write({ kind: 'fact', text });
+    const produced = store.state.summaries.length;
+    const skipped = (store.state.events ?? []).filter((event) => event.kind === 'summary.skip-outliers').length;
+    assert.ok(produced > 0, `松散簇也该压得出来（现在 0 组，跳过了 ${skipped} 次）`);
+  } finally {
+    await close(dir);
+  }
+});
+
 test('冷却与兜底上限：冷却没到就空跑，超过 compactAt 就无视冷却', async () => {
   const { dir, store } = await openTempStore({ compactCooldownMs: 3_600_000, compactDelta: 999, compactAt: 0 });
   try {
