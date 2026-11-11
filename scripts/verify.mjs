@@ -253,6 +253,14 @@ await check('host: 压缩按冗余触发，且原文不许被修剪掉', () => {
   }
 });
 
+await check('host: 模型路由有诊断口（拿不到路由时不许只能靠猜）', () => {
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!hostSource.includes("route === 'api/llm'")) throw new Error('缺少 GET /api/llm 诊断口');
+  for (const field of ['hasService', 'providers', 'route', 'describe']) {
+    if (!hostSource.includes(field)) throw new Error(`诊断报告缺字段 ${field}`);
+  }
+});
+
 await check('client: showTrace 每页各有一份，出处面板只有一处实现', () => {
   const defs = source.split('const showTrace = React.useCallback').length - 1;
   if (defs < 2) throw new Error(`showTrace 只定义了 ${defs} 份：另一页引用它会 ReferenceError（0.61 就是这么白屏的）`);
