@@ -3,6 +3,30 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.65.1] - 2026-11-12
+
+### 修复：模型路由被一次"暂时问不到"永久毒死
+诊断口一读就现形了：`hasService=true`、四个方法都在、providers 列出了
+`deepseek-official`（`deepseek-flash` / `deepseek-v4-pro`）……可路由是空的，
+`describe()` 一直说「不可用（回落到抽取式）」。
+
+**原因**：`ctx.inject(['llm'])` 是异步的。启动早期任何一次 `route()` 调用都落在
+"服务还没注入"那一刻，旧代码在那里写了 `cachedRoute = null`，而 `null` 又是个
+**永不重试**的缓存 —— 于是之后哪怕服务早就到位，也永远返回不可用。
+
+也就是说：摘要全是抽取式的、消融报"没有可用的模型路由"，根子都在这一行。
+
+**改法**：
+- "服务还没注入" ≠ "没有路由"。前者**不缓存**，下次调用重新发现。
+- 真的发现过、确实挑不出路由时，才记 `null`，并按 `ROUTE_RETRY_MS`（60 秒）过期 ——
+  配好 provider 之后不能一直卡在旧结论上。
+- `invalidate()`（面板改 provider/model 时调）同时清掉这个时间戳。
+
+### 测试
+- 新增 `test/route-cache.test.mjs`（3 项）：暂时问不到不许污染缓存、
+  真空结果按时间过期、配置给了 provider/model 直接采用。
+- 274 测试 / verify 54 全绿。
+
 ## [0.65.0] - 2026-11-11
 
 ### 新增：`GET /api/llm` —— 模型路由诊断（只读）
