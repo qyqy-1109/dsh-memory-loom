@@ -261,6 +261,14 @@ await check('host: 模型路由有诊断口（拿不到路由时不许只能靠�
   }
 });
 
+await check('host: 旧摘要能用模型重写（抽取式的要补得上）', () => {
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  if (!hostSource.includes("route === 'api/summaries/rewrite'")) throw new Error('缺少摘要重写路由');
+  if (!storeSource.includes('summaryPayload(')) throw new Error('缺少重写材料来源');
+  if (!storeSource.includes("row.generator = 'llm'")) throw new Error('重写后要标成 llm，否则看不出哪条还是抽取式的');
+});
+
 await check('client: 出处面板在纸色页不许用深色卡片的控件', () => {
   if (!source.includes("buttonClass: 'ml-ybtn', noteClass: 'ml-quiet'")) {
     throw new Error('人格页没给 TracePanel 传纸色类名：收起按钮会变成一个小黑框');

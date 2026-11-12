@@ -145,6 +145,26 @@ test('离群判据是相对的：低相似度的簇不许被整组判死', async
   }
 });
 
+test('重写材料取的是成员原文，不是摘要自己的文字', async () => {
+  const { dir, store } = await openTempStore({ summaryMinMembers: 4 });
+  try {
+    for (const text of TOPIC) await store.write({ kind: 'fact', text });
+    const summary = store.state.summaries[0];
+    assert.ok(summary !== undefined, '前提：先压出一组');
+    const payload = store.summaryPayload(summary.id);
+    assert.notEqual(payload, null);
+    assert.equal(payload.id, summary.id);
+    assert.ok(payload.points.length >= 4, '要有原文可喂给模型');
+    assert.ok(
+      payload.points.some((point) => point.includes('read/write/edit')),
+      '材料必须是成员原文，不能是摘要自己的拼接文本（那会变成传话游戏的第一环）',
+    );
+    assert.equal(store.summaryPayload('不存在'), null);
+  } finally {
+    await close(dir);
+  }
+});
+
 test('冷却与兜底上限：冷却没到就空跑，超过 compactAt 就无视冷却', async () => {
   const { dir, store } = await openTempStore({ compactCooldownMs: 3_600_000, compactDelta: 999, compactAt: 0 });
   try {
