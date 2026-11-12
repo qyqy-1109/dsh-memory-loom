@@ -261,6 +261,12 @@ await check('host: 模型路由有诊断口（拿不到路由时不许只能靠�
   }
 });
 
+await check('client: 出处面板在纸色页不许用深色卡片的控件', () => {
+  if (!source.includes("buttonClass: 'ml-ybtn', noteClass: 'ml-quiet'")) {
+    throw new Error('人格页没给 TracePanel 传纸色类名：收起按钮会变成一个小黑框');
+  }
+});
+
 await check('client: showTrace 每页各有一份，出处面板只有一处实现', () => {
   const defs = source.split('const showTrace = React.useCallback').length - 1;
   if (defs < 2) throw new Error(`showTrace 只定义了 ${defs} 份：另一页引用它会 ReferenceError（0.61 就是这么白屏的）`);
