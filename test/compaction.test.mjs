@@ -145,6 +145,25 @@ test('离群判据是相对的：低相似度的簇不许被整组判死', async
   }
 });
 
+test('快照把摘要全给出去：看得见的才撤得回', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    // 直接摆 8 条：这条测的是快照的裁剪口径，不是聚类
+    store.state.summaries = Array.from({ length: 8 }, (_, index) => ({
+      id: `s-${index}`,
+      topic: `t-${index}`,
+      memberIds: [],
+      memberCount: 0,
+      createdAt: index,
+    }));
+    const snapshot = store.snapshot();
+    assert.equal(snapshot.summaries.length, 8, '不许只给最近 5 条——老的看不见也就撤不了');
+    assert.equal(snapshot.summaries[0].id, 's-7', '按时间倒序，最近的在前');
+  } finally {
+    await close(dir);
+  }
+});
+
 test('重写材料取的是成员原文，不是摘要自己的文字', async () => {
   const { dir, store } = await openTempStore({ summaryMinMembers: 4 });
   try {
