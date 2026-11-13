@@ -261,6 +261,15 @@ await check('host: 模型路由有诊断口（拿不到路由时不许只能靠�
   }
 });
 
+await check('host: 摘要回考（串味的成员踢回活跃）在位', () => {
+  const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');
+  const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
+  if (!storeSource.includes('async recheckSummaryMembers')) throw new Error('缺少摘要回考');
+  if (!storeSource.includes('summary.recheck')) throw new Error('回考没留读数（踢了几条、留了几条要能查）');
+  if (!storeSource.includes('compactBlocked')) throw new Error('踢回后没上冷却，下一轮会被同一个簇吸回去');
+  if (!hostSource.includes('recheckSummaryMembers')) throw new Error('重写完没接回考，等于没做');
+});
+
 await check('host: 旧摘要能用模型重写（抽取式的要补得上）', () => {
   const hostSource = readFileSync(join(process.cwd(), 'lib', 'index.js'), 'utf8');
   const storeSource = readFileSync(join(process.cwd(), 'lib', 'store.js'), 'utf8');

@@ -145,6 +145,71 @@ test('离群判据是相对的：低相似度的簇不许被整组判死', async
   }
 });
 
+test('摘要回考：只共享高频词的成员被踢回活跃，并进冷却', async () => {
+  const { dir, store } = await openTempStore({ summaryMinMembers: 3 });
+  try {
+    // 一堆共享高频词（插件／面板／列表）的填充物，把"插件""面板"压成高频词
+    for (let index = 0; index < 8; index += 1) {
+      await store.write({ kind: 'fact', text: `插件面板的记忆列表第 ${index} 次调整，和共同生活世界无关${index}` });
+    }
+    // 真成员：带一个稀有词（蓝鲸旗标），摘要里也提到它 —— 这才是"同一件事"
+    const kept = await store.write({ kind: 'fact', text: '插件面板的记忆列表改用蓝鲸旗标标记顺序' });
+    // 串味的：只共享"插件／面板"这种高频词
+    const intruder = await store.write({
+      kind: 'fact',
+      text: '插件面板：消融线索关掉时应当说明缺的是模型路由',
+    });
+
+    const summaryId = 'sum-llm-1';
+    const summaryText = '插件面板的记忆列表调整记录：共九次，其中一次改用蓝鲸旗标标记顺序。';
+    for (const id of [kept.id, intruder.id]) {
+      const row = store.state.memories.find((item) => item.id === id);
+      row.status = 'archived';
+      row.archivedReason = 'summarized';
+      row.summarizedBy = summaryId;
+    }
+    store.state.summaries.push({
+      id: summaryId,
+      topic: '插件面板调参',
+      text: summaryText,
+      memberIds: [kept.id, intruder.id],
+      memberCount: 2,
+      createdAt: Date.now(),
+      generator: 'llm',
+    });
+
+    const result = await store.recheckSummaryMembers(summaryId);
+    assert.equal(result.ok, true);
+    assert.equal(result.evicted, 1, '讲模型路由那条该被踢出去，带稀有词的留下');
+    assert.equal(store.byId(intruder.id).status, 'active', '被踢回的回到活跃');
+    assert.equal(store.byId(intruder.id).summarizedBy, null, '归档痕迹要擦掉，否则撤销归纳会认错人');
+    assert.ok((store.byId(intruder.id).compactBlocked?.until ?? 0) > Date.now(), '要上冷却，免得下轮又被吸回去');
+    assert.deepEqual(store.state.summaries.find((row) => row.id === summaryId).memberIds, [kept.id], '留真的那条');
+  } finally {
+    await close(dir);
+  }
+});
+
+test('摘要回考：抽取式的不考（拿关键词考关键词没有意义）', async () => {
+  const { dir, store } = await openTempStore();
+  try {
+    store.state.summaries.push({
+      id: 'sum-extractive',
+      topic: 't',
+      text: '关键词拼接',
+      memberIds: [],
+      memberCount: 0,
+      createdAt: Date.now(),
+      generator: 'extractive',
+    });
+    const result = await store.recheckSummaryMembers('sum-extractive');
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'extractive');
+  } finally {
+    await close(dir);
+  }
+});
+
 test('快照把摘要全给出去：看得见的才撤得回', async () => {
   const { dir, store } = await openTempStore();
   try {
